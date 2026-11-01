@@ -6,4 +6,8 @@
     <string name="custom_suggestion_font_size_desc">Controla el tamaño de las palabras sugeridas sin modificar las teclas (sp).</string>
     <string name="custom_action_icon_scale">Escala de iconos de acciones</string>
     <string name="custom_action_icon_scale_desc">Cambia el tamaño del micrófono y otros iconos sin modificar las teclas.</string>
+    <string name="custom_suggestion_theme_font_scale">Escala de letras de sugerencias (tema)</string>
+    <string name="custom_suggestion_theme_text_color">Color del texto de sugerencias</string>
+    <string name="custom_suggestion_theme_bar_color">Color de fondo de la barra</string>
+    <string name="custom_suggestion_theme_reset_color">Usar color predeterminado del tema</string>
 </resources>
