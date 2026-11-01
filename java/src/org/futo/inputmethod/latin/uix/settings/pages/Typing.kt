@@ -98,6 +98,9 @@ import org.futo.inputmethod.latin.settings.toLongPressKeyLayoutItems
 import org.futo.inputmethod.latin.uix.AndroidTextInput
 import org.futo.inputmethod.latin.uix.BasicThemeProvider
 import org.futo.inputmethod.latin.uix.KeyHintsSetting
+import org.futo.inputmethod.latin.uix.SuggestionBarHeightSetting
+import org.futo.inputmethod.latin.uix.SuggestionFontSizeSetting
+import org.futo.inputmethod.latin.uix.ActionIconScaleSetting
 import org.futo.inputmethod.latin.uix.LocalKeyboardScheme
 import org.futo.inputmethod.latin.uix.SHOW_EMOJI_SUGGESTIONS
 import org.futo.inputmethod.latin.uix.SettingsKey
@@ -233,6 +236,34 @@ fun ResizeScreen(navController: NavHostController = rememberNavController()) {
 
             Spacer(Modifier.height(8.dp))
             ResizeMenuLite.render(showTitle = false)
+
+            SettingSlider(
+                title = stringResource(R.string.custom_suggestion_bar_height),
+                subtitle = stringResource(R.string.custom_suggestion_bar_height_desc),
+                setting = SuggestionBarHeightSetting,
+                range = 28.0f..120.0f,
+                hardRange = 24.0f..200.0f,
+                transform = { it.roundToInt() },
+                indicator = { "$it dp" }
+            )
+            SettingSlider(
+                title = stringResource(R.string.custom_suggestion_font_size),
+                subtitle = stringResource(R.string.custom_suggestion_font_size_desc),
+                setting = SuggestionFontSizeSetting,
+                range = 12.0f..56.0f,
+                hardRange = 8.0f..144.0f,
+                transform = { it.roundToInt() },
+                indicator = { "$it sp" }
+            )
+            SettingSlider(
+                title = stringResource(R.string.custom_action_icon_scale),
+                subtitle = stringResource(R.string.custom_action_icon_scale_desc),
+                setting = ActionIconScaleSetting,
+                range = 0.5f..2.5f,
+                hardRange = 0.2f..5.0f,
+                transform = { it },
+                indicator = { "%.2f×".format(it) }
+            )
 
             AndroidTextInput(allowPredictions = false, customOptions = setOf("org.futo.inputmethod.latin.ResizeMode"), autoshow = false)
         }

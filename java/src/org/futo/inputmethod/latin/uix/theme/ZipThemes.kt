@@ -116,6 +116,7 @@ object ZipThemes {
         theme.thumbnailImage?.let(putFile)
         theme.backgroundImage?.let(putFile)
         theme.keysFont?.let(putFile)
+        theme.actionMicIcon?.let(putFile)
         theme.keyBackgrounds.values.forEach(putFile)
         theme.keyIcons.values.forEach(putFile)
 

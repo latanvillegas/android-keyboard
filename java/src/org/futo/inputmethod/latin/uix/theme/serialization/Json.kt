@@ -210,6 +210,8 @@ data class SerializableJsonTheme(
     val keyBorders: Boolean = true,
 
     val keysFont: String? = null,
+    val actionMicIcon: String? = null,
+    val actionMicIconScale: Float = 1.0f,
 
     val name: String? = null,
     val id: String? = null,
@@ -300,6 +302,8 @@ data class SerializableJsonTheme(
                         KeyIcon(it.asAndroidBitmap().toDrawable(ctx.context.resources))
                     },
                     font = decodeOptionalFont(ctx, keysFont),
+                    actionMicIcon = decodeOptionalImage(ctx, actionMicIcon),
+                    actionMicIconScale = actionMicIconScale,
 
                     themeName = name,
                     themeAuthor = author

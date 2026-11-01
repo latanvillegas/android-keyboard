@@ -75,6 +75,8 @@ private data class SerializedTomlFile(
 
         val scale_text: LFloat = 1.0f,
         val scale_hints: LFloat = 1.0f,
+        val mic_icon: String? = null,
+        val mic_icon_scale: LFloat = 1.0f,
         val weight_text: LFloat = 400.0f,
         val weight_hints: LFloat = 500.0f,
         val font: Font? = null,
@@ -352,6 +354,8 @@ private data class SerializedTomlFile(
                     backgroundShader = null,
 
                     actionBarOpacity = options.background?.action_bar_opacity ?: 0.5f,
+                    actionMicIcon = decodeOptionalImage(ctx, options.mic_icon),
+                    actionMicIconScale = options.mic_icon_scale,
                     thumbnailImage = backgroundImage,
                     thumbnailScale = 1.0f,
                     backgroundImage = backgroundImage,

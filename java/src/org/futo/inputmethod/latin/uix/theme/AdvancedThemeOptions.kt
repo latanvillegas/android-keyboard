@@ -32,6 +32,8 @@ data class AdvancedThemeOptions(
     val keyBorders: Boolean? = null,
     val keyBackgrounds: KeyedBitmaps<KeyBackground>? = null,
     val keyIcons: KeyedBitmaps<KeyIcon>? = null,
+    val actionMicIcon: ImageBitmap? = null,
+    val actionMicIconScale: Float = 1.0f,
     val font: Typeface? = null,
     val themeName: String? = null,
     val themeAuthor: String? = null,

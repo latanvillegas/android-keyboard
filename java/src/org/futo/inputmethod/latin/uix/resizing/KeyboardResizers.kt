@@ -32,14 +32,15 @@ open class KeyboardResizeHelper(
     initialSettings: SavedKeyboardSizingSettings,
     val delta: DragDelta
 ) {
-    val minimumKeyboardWidth = 48.dp * 3
-    val maximumKeyboardWidth = with(density) { viewSize.width.toDp() }
+    // Limit to physical viewport; keep a nonzero geometry invariant.
+    val minimumKeyboardWidth = 1.dp
+    val maximumKeyboardWidth = with(density) { viewSize.width.toDp() }.coerceAtLeast(1.dp)
 
-    val minimumKeyboardHeight = 32.dp * 3
-    val maximumKeyboardHeight = with(density) { (viewSize.height * 2.0f / 3.0f).toDp() }.coerceAtLeast(128.dp * 3)
+    val minimumKeyboardHeight = 1.dp
+    val maximumKeyboardHeight = with(density) { viewSize.height.toDp() }.coerceAtLeast(1.dp)
 
-    val maximumSidePadding = 64.dp
-    val maximumBottomPadding = 72.dp
+    val maximumSidePadding = (maximumKeyboardWidth / 2f - 1.dp).coerceAtLeast(0.dp)
+    val maximumBottomPadding = (maximumKeyboardHeight - minimumKeyboardHeight).coerceAtLeast(0.dp)
 
     var result = true
 
@@ -293,7 +294,7 @@ class SplitKeyboardResizeHelper(
 
         var newFraction = editedSettings.splitWidthFraction * (newSplitWidth / oldSplitWidth)
 
-        val fractionRange = 0.1f .. 0.9f
+        val fractionRange = (1f / viewSize.width.coerceAtLeast(1)) .. 1.0f
         if(newFraction !in fractionRange) {
             newFraction = newFraction.coerceIn(fractionRange)
             result = false

@@ -73,6 +73,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.scale
@@ -168,6 +169,34 @@ import kotlin.math.roundToInt
  */
 
 val ActionBarHeight = 40.dp
+
+@Composable
+private fun adjustableActionBarHeight(): Dp =
+    useDataStoreValue(SuggestionBarHeightSetting).coerceIn(24, 200).dp
+
+@Composable
+private fun adjustableSuggestionStyle(base: TextStyle, ratio: Float = 1.0f): TextStyle {
+    val fontSize = useDataStoreValue(SuggestionFontSizeSetting).coerceIn(8, 144) * ratio
+    return base.copy(fontSize = fontSize.sp, lineHeight = (fontSize * 1.4f).sp)
+}
+
+@Composable
+private fun ThemedActionIcon(action: Action, defaultSize: Dp, tint: Color) {
+    val theme = LocalKeyboardScheme.current.extended.advancedThemeOptions
+    val mic = if (action.icon == R.drawable.mic_fill) theme.actionMicIcon else null
+    val userScale = useDataStoreValue(ActionIconScaleSetting)
+        .takeIf { it.isFinite() }?.coerceIn(0.2f, 5.0f) ?: 1.0f
+    val themeScale = if (mic != null) {
+        theme.actionMicIconScale.takeIf { it.isFinite() }?.coerceIn(0.2f, 5.0f) ?: 1.0f
+    } else 1.0f
+    val size = (defaultSize.value * userScale * themeScale).coerceIn(4.0f, 96.0f).dp
+    Icon(
+        painter = mic?.let { BitmapPainter(it) } ?: painterResource(id = action.icon),
+        contentDescription = stringResource(action.name),
+        tint = if (mic != null) Color.Unspecified else tint,
+        modifier = Modifier.size(size)
+    )
+}
 
 val ActionBarScrollIndexSetting = SettingsKey(
     intPreferencesKey("action_bar_scroll_index"),
@@ -339,10 +368,10 @@ fun RowScope.SuggestionItem(words: SuggestedWords, idx: Int, isPrimary: Boolean,
         }
     }
 
-    val textStyle = when(isAutocorrect) {
+    val textStyle = adjustableSuggestionStyle(when(isAutocorrect) {
         true -> suggestionStylePrimary
         false -> suggestionStyleAlternative
-    }.copy(color = color).withCustomFont(potentiallyCompatEmojiFont)
+    }).copy(color = color).withCustomFont(potentiallyCompatEmojiFont)
 
     Box(
         modifier = textButtonModifier
@@ -555,12 +584,7 @@ fun LazyItemScope.ActionItem(idx: Int, action: Action, onSelect: (Action) -> Uni
         .combinedClickable(
             onLongClick = action.altPressImpl?.let { { onLongSelect(action) } },
             onClick = { onSelect(action) }), contentAlignment = Center) {
-        Icon(
-            painter = painterResource(id = action.icon),
-            contentDescription = stringResource(action.name),
-            tint = contentCol,
-            modifier = Modifier.size(20.dp),
-        )
+        ThemedActionIcon(action, 20.dp, contentCol)
     }
 }
 
@@ -592,12 +616,7 @@ fun ActionItemSmall(action: Action, onSelect: (Action) -> Unit, onLongSelect: (A
         },
         contentAlignment = Center
     ) {
-        Icon(
-            painter = painterResource(id = action.icon),
-            contentDescription = stringResource(action.name),
-            tint = fgCol,
-            modifier = Modifier.size(16.dp)
-        )
+        ThemedActionIcon(action, 16.dp, fgCol)
     }
 }
 
@@ -757,7 +776,7 @@ fun ImportantNoticeView(
             colors = ButtonDefaults.textButtonColors(contentColor = LocalKeyboardScheme.current.onBackground),
             enabled = true
         ) {
-            AutoFitText(importantNotice.getText(), style = suggestionStylePrimary.copy(color = LocalKeyboardScheme.current.onBackground).withCustomFont())
+            AutoFitText(importantNotice.getText(), style = adjustableSuggestionStyle(suggestionStylePrimary).copy(color = LocalKeyboardScheme.current.onBackground).withCustomFont())
         }
 
         val color = LocalKeyboardScheme.current.primary
@@ -835,7 +854,7 @@ fun ActionBar(
 
     Column(Modifier
         .height(
-            ActionBarHeight * (if (useDoubleHeight) 2 else 1).let {
+            adjustableActionBarHeight() * (if (useDoubleHeight) 2 else 1).let {
                 if(needToUseExpandableSuggestionUi) {
                     it - 1
                 } else {
@@ -941,7 +960,7 @@ fun ActionWindowBar(
     onBack: () -> Unit,
     onExpand: () -> Unit
 ) {
-    Column(Modifier.height(ActionBarHeight)) {
+    Column(Modifier.height(adjustableActionBarHeight())) {
         ActionSep()
         Surface(
             modifier = Modifier
@@ -1004,7 +1023,7 @@ fun CollapsibleSuggestionsBar(
     words: SuggestedWords?,
     suggestionStripListener: SuggestionStripViewListener,
 ) {
-    Column(Modifier.height(ActionBarHeight)) {
+    Column(Modifier.height(adjustableActionBarHeight())) {
         ActionSep()
         Surface(
             modifier = Modifier
@@ -1082,9 +1101,9 @@ private fun CandidateItem(modifier: Modifier, it: SuggestedWordInfo, listener: S
     val description = it.mCandidateDescription
     val color = LocalKeyboardScheme.current.onSurface
     val textStyle =
-        suggestionStylePrimary.copy(color = color).withCustomFont()
+        adjustableSuggestionStyle(suggestionStylePrimary).copy(color = color).withCustomFont()
     val descTextStyle =
-        suggestionStyleCandidateDescription.copy(color = color.copy(alpha = 0.5f)).withCustomFont() // TODO: High contrast for high contrast theme
+        adjustableSuggestionStyle(suggestionStyleCandidateDescription, 0.5f).copy(color = color.copy(alpha = 0.5f)).withCustomFont() // TODO: High contrast for high contrast theme
     Row(
         modifier
             .width(width)
@@ -1265,7 +1284,7 @@ private fun RowScope.InlineCandidates(
                 }
             }
             itemsIndexed(wordList) { i, it ->
-                CandidateItem(Modifier.height(ActionBarHeight), it,
+                CandidateItem(Modifier.height(adjustableActionBarHeight()), it,
                     listener = suggestionStripListener,
                     last = i == wordList.size-1,
                     width = with(LocalDensity.current) {
@@ -1374,9 +1393,9 @@ fun BoxScope.ActionBarWithExpandableCandidates(
     val density = LocalDensity.current
 
     // True width measurement is too slow, estimate it by multiplying constant by number of characters
-    val styleNormal = suggestionStylePrimary.withCustomFont()
-    val styleDescription = suggestionStyleCandidateDescription.withCustomFont()
-    val widths = remember(measurer) {
+    val styleNormal = adjustableSuggestionStyle(suggestionStylePrimary).withCustomFont()
+    val styleDescription = adjustableSuggestionStyle(suggestionStyleCandidateDescription, 0.5f).withCustomFont()
+    val widths = remember(measurer, styleNormal, styleDescription) {
         CachedCharacterWidthValues(
             normal = measurer.measure("あ", style=styleNormal).size.width,
             description = measurer.measure("あ", style=styleDescription).size.width
@@ -1386,7 +1405,7 @@ fun BoxScope.ActionBarWithExpandableCandidates(
 
     if(canShowSuggest) {
         Surface(
-            Modifier.fillMaxWidth().padding(0.dp, ActionBarHeight, 0.dp, 0.dp)
+            Modifier.fillMaxWidth().padding(0.dp, adjustableActionBarHeight(), 0.dp, 0.dp)
                 .heightIn(max = with(density) { keyboardOffset?.intValue?.toDp() ?: 0.dp })
                 .safeKeyboardPadding()
         ) {
@@ -1394,7 +1413,7 @@ fun BoxScope.ActionBarWithExpandableCandidates(
                 listToRender ?: emptyList(),
                 itemMeasurer = { measureWord(density, widths, it) }
             ) { allocatedWidth, item, isLast ->
-                CandidateItem(Modifier.height(ActionBarHeight), item, listener = suggestionStripListener, width=with(density) { allocatedWidth.toDp()  }, last=isLast)
+                CandidateItem(Modifier.height(adjustableActionBarHeight()), item, listener = suggestionStripListener, width=with(density) { allocatedWidth.toDp()  }, last=isLast)
             }
         }
     }
@@ -1404,7 +1423,7 @@ fun BoxScope.ActionBarWithExpandableCandidates(
                 testTag = "ActionBar"
                 testTagsAsResourceId = true
             }
-            .height(ActionBarHeight)
+            .height(adjustableActionBarHeight())
             .align(Alignment.TopCenter)
     ) {
         ActionSep()

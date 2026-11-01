@@ -712,4 +712,11 @@ Default is %1$s</string>
     <string name="personal_dictionary_delete_additional_file">Delete extra dictionary file?</string>
     <!-- %1$s will be replaced with the custom dictionary name -->
     <string name="personal_dictionary_delete_additional_file_text">%1$s will be deleted</string>
+    <!-- Independent keyboard customization controls -->
+    <string name="custom_suggestion_bar_height">Suggestion bar height</string>
+    <string name="custom_suggestion_bar_height_desc">Adjust the height of predictions and action bar (dp).</string>
+    <string name="custom_suggestion_font_size">Suggestion text size</string>
+    <string name="custom_suggestion_font_size_desc">Control predicted word size independently of key labels (sp).</string>
+    <string name="custom_action_icon_scale">Action icon scale</string>
+    <string name="custom_action_icon_scale_desc">Resize microphone and toolbar icons without changing key size.</string>
 </resources>
