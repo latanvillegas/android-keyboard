@@ -36,6 +36,9 @@ data class CustomThemeBuilderConfiguration(
     val backgroundImageRect: Rect = Rect.Zero,
     val thumbnailImagePath: String? = null,
     val thumbnailImageScale: Float = 1.0f,
+    val suggestionFontScale: Float = 1.0f,
+    val suggestionTextColor: Color? = null,
+    val suggestionBarColor: Color? = null,
 ) {
     private val variant = Variant.VIBRANT
     private val col: Hct = Hct.from(hue, chroma, tone)
@@ -115,7 +118,11 @@ data class CustomThemeBuilderConfiguration(
 
     fun build(): SerializableJsonTheme {
         val colorScheme = buildScheme()
-        return initBasicSerializableThemeFromKeyboardScheme(colorScheme).let {
+        return initBasicSerializableThemeFromKeyboardScheme(colorScheme).copy(
+            suggestionFontScale = suggestionFontScale,
+            suggestionTextColor = suggestionTextColor?.toSColor(),
+            suggestionBarColor = suggestionBarColor?.toSColor()
+        ).let {
             if(backgroundImagePath != null) {
                 val alpha = (1.0f - backgroundImageOpacity.pow(2)) * 0.32f + 0.5f
                 it.copy(
