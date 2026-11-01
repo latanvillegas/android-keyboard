@@ -25,14 +25,34 @@ check_orientation() {
   local label="$1"
   adb shell am force-stop "$test_package" || true
   adb shell am start -W -n "$test_package/$activity" | tee "android-evidence/start-$label.txt"
-  sleep 5
-  adb shell dumpsys input_method > "android-evidence/ime-$label.txt"
+  # An IME can be selected without being displayed. Wait for the actual
+  # input view (and attempt focus once if the cold-start IME is late).
+  local shown=0
+  local attempt
+  for attempt in $(seq 1 20); do
+    adb shell dumpsys input_method > "android-evidence/ime-$label.txt"
+    if grep -Fq "mCurMethodId=$ime" "android-evidence/ime-$label.txt" &&
+       grep -Eq '^[[:space:]]*mInputShown=true' "android-evidence/ime-$label.txt"; then
+      shown=1
+      break
+    fi
+
+    if [[ "$attempt" == 3 || "$attempt" == 8 ]]; then
+      if [[ "$label" == portrait ]]; then
+        adb shell input tap 90 1200
+      else
+        adb shell input tap 90 280
+      fi
+    fi
+    sleep 2
+  done
+
   adb shell dumpsys activity activities > "android-evidence/activity-$label.txt"
   adb exec-out screencap -p > "android-evidence/keyboard-$label.png"
-  grep -Fq 'org.futo.inputmethod.latin.unstable' "android-evidence/ime-$label.txt" || {
-    echo "FUTO IME missing from input_method state ($label)" >&2
+  if [[ "$shown" != 1 ]]; then
+    echo "::error::IME was selected but its input view was not shown ($label)" >&2
     return 1
-  }
+  fi
 }
 
 adb shell settings put system accelerometer_rotation 0
