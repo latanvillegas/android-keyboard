@@ -832,17 +832,16 @@ fun RowScope.PinnedActionItems(onSelect: (Action) -> Unit, onLongSelect: (Action
     }
 }
 
+/**
+ * Horizontal separators are deliberately disabled for every theme. The former
+ * 1.dp keyboardContainer-colored border could appear bright green above and
+ * below the prediction strip, including in the resize preview.
+ *
+ * The composable remains as a compatibility hook for all existing action-bar
+ * variants; it never consumes height or draws pixels.
+ */
 @Composable
-fun ActionSep(isExtra: Boolean = false) {
-    if(isExtra && (LocalInspectionMode.current || LocalThemeProvider.current.keyBorders)) return
-
-    val sepCol = LocalKeyboardScheme.current.keyboardContainer
-
-    Box(modifier = Modifier
-        .fillMaxWidth()
-        .height(1.dp)
-        .background(sepCol)) {}
-}
+fun ActionSep(@Suppress("UNUSED_PARAMETER") isExtra: Boolean = false) = Unit
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable

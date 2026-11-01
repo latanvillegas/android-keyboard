@@ -28,9 +28,10 @@ long suggestions, ZIP import/export, rotation and IME/inset behavior.
 
 ## Suggested words bar: local sizing and theme appearance
 
-The prediction font size is editable in **Keyboard settings**, and the same
-setting remains available under **Resize**. It ranges from 8 to 144 sp, and
-defaults to 18 sp. Changing it does not resize key labels or keyboard geometry.
+The prediction font size is editable exclusively under **Keyboard settings
+→ Resize**. It ranges from 8 to 144 sp and defaults to 18 sp. The setting is
+not duplicated on the main keyboard settings screen. Changing it does not
+resize key labels or keyboard geometry.
 
 The built-in **Create custom theme** editor now has three new controls:
 suggestion font scale (50–300% of the user's chosen size), suggestion text
@@ -56,3 +57,14 @@ leave existing themes unchanged. Invalid non-finite scale values fall back to
 
 The public FUTO-hosted web theme editor is not part of this fork: these
 controls are in the **in-app theme editor** and imported theme files.
+
+## Clean suggestion strip and Release-only builds
+
+The horizontal top and bottom action-bar separators are disabled globally,
+regardless of active theme and including keyboard-resize previews. Vertical
+suggestion-word dividers and action icons are unchanged.
+
+The fork's GitHub Actions configuration produces only the optimized
+`assembleStableRelease` APK; the former Debug APK workflow was removed.
+Without a configured production keystore, the Release APK is test-signed
+with the repository's development key (as documented in `RELEASE_BUILD.md`).

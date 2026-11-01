@@ -39,6 +39,6 @@ Conservar la MISMA clave utilizada por la versión instalada si se pretende
 actualizar esa instalación. No subir el keystore ni las contraseñas al código
 fuente ni compartirlos mediante la conversación.
 
-El workflow independiente `.github/workflows/android-verify.yml` genera
-la compilación Debug y verifica el motor de tamaños en emulador Android 35.
+Este fork mantiene **solo el workflow Release**. Se eliminó
+`.github/workflows/android-verify.yml` para evitar generar APK Debug.
 Las pruebas en un teléfono físico requieren acceso ADB al dispositivo.
