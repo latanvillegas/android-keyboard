@@ -4,6 +4,7 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -34,6 +35,10 @@ data class AdvancedThemeOptions(
     val keyIcons: KeyedBitmaps<KeyIcon>? = null,
     val actionMicIcon: ImageBitmap? = null,
     val actionMicIconScale: Float = 1.0f,
+    val suggestionFontScale: Float = 1.0f,
+    val suggestionTextColor: Color? = null,
+    val suggestionBarColor: Color? = null,
+    val suggestionDividerColor: Color? = null,
     val font: Typeface? = null,
     val themeName: String? = null,
     val themeAuthor: String? = null,
