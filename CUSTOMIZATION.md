@@ -68,3 +68,19 @@ The fork's GitHub Actions configuration produces only the optimized
 `assembleStableRelease` APK; the former Debug APK workflow was removed.
 Without a configured production keystore, the Release APK is test-signed
 with the repository's development key (as documented in `RELEASE_BUILD.md`).
+
+## Key glyph sizing, emoji cell sizing, and optional 3D relief
+
+In **Keyboard → Resize**, key labels (letters, number row and secondary
+number hints) scale independently by 50–220%, default 100%. Key geometry
+and the split/floating settings are unchanged.
+
+Emoji and ASCII emoticon cells in the picker can be sized from 28 to 72 dp,
+default 42 dp; emoji suggestions also scale relative to the default. The
+3D relief toggle is on by default and applies a shaded raised surface
+plus soft glyph shadow in the emoji picker.
+
+This is a **2.5D renderer effect**, not replacement 3D emoji art assets.
+Unicode codepoints, skin tone behavior, and inserted text remain unchanged.
+
+The GitHub Actions pipeline builds **Release only**, never Debug.

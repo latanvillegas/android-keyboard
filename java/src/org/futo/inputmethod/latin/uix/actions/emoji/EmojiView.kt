@@ -21,6 +21,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
+import android.graphics.Shader
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
@@ -60,7 +62,57 @@ class EmojiView @JvmOverloads constructor(
     }
 
     internal var willDrawVariantIndicator: Boolean = true
+    private var raisedStyle: Boolean = true
     private var textScale: Float = 1.0f
+
+    /** Raised 2.5D surface, with original Unicode emoji font retained. */
+    fun setRaisedStyle(enabled: Boolean) {
+        raisedStyle = enabled
+    }
+
+    private val reliefPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    private fun Canvas.drawRaisedEmojiSurface() {
+        val w = width.toFloat()
+        val h = height.toFloat()
+        if (w <= 0f || h <= 0f) return
+        val inset = minOf(w, h) * 0.11f
+        val drop = minOf(w, h) * 0.06f
+        val radius = minOf(w, h) * 0.33f
+        val left = inset
+        val top = inset
+        val right = w - inset
+        val bottom = h - inset - drop
+
+        reliefPaint.shader = null
+        reliefPaint.style = Paint.Style.FILL
+        reliefPaint.color = Color.argb(95, 0, 0, 0)
+        drawRoundRect(
+            left + drop * 0.4f, top + drop, right + drop * 0.4f,
+            bottom + drop, radius, radius, reliefPaint
+        )
+        reliefPaint.shader = LinearGradient(
+            0f, top, 0f, bottom,
+            intArrayOf(
+                Color.argb(165, 255, 255, 255),
+                Color.argb(75, 255, 255, 255),
+                Color.argb(105, 30, 36, 53)
+            ),
+            floatArrayOf(0.0f, 0.48f, 1.0f),
+            Shader.TileMode.CLAMP
+        )
+        drawRoundRect(left, top, right, bottom, radius, radius, reliefPaint)
+        reliefPaint.shader = null
+        reliefPaint.color = Color.argb(150, 255, 255, 255)
+        reliefPaint.style = Paint.Style.STROKE
+        reliefPaint.strokeWidth = minOf(w, h) * 0.018f
+        drawRoundRect(
+            left + reliefPaint.strokeWidth, top + reliefPaint.strokeWidth,
+            right - reliefPaint.strokeWidth, bottom - reliefPaint.strokeWidth,
+            radius, radius, reliefPaint
+        )
+        reliefPaint.style = Paint.Style.FILL
+    }
     private var isAbleToScaleHorizontally = false
 
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
@@ -124,10 +176,10 @@ class EmojiView @JvmOverloads constructor(
         set(value) {
             field = value
 
-            offscreenCanvasBitmap.eraseColor(Color.TRANSPARENT)
             post {
                 if (value != null) {
                     if (value == this.emoji) {
+                        offscreenCanvasBitmap.eraseColor(Color.TRANSPARENT)
                         drawEmoji(
                             value.emoji,
                             drawVariantIndicator = willDrawVariantIndicator && value.skinTones
@@ -144,6 +196,7 @@ class EmojiView @JvmOverloads constructor(
     private fun drawEmoji(emoji: CharSequence, drawVariantIndicator: Boolean) {
         //offscreenCanvasBitmap.eraseColor(Color.TRANSPARENT)
         offscreenCanvasBitmap.applyCanvas {
+            if (raisedStyle) drawRaisedEmojiSurface()
             if (emoji is Spanned) {
                 createStaticLayout(emoji, width).draw(this)
             } else {
@@ -175,6 +228,12 @@ class EmojiView @JvmOverloads constructor(
                 val textCenterY = height / 2f
                 val baselineY = textCenterY - textHeight / 2f - fm.ascent
 
+                if (raisedStyle) {
+                    textPaint.setShadowLayer(
+                        width * 0.025f, width * 0.014f, height * 0.022f,
+                        Color.argb(135, 0, 0, 0)
+                    )
+                }
                 drawText(
                     emoji,
                     /* start = */ 0,
@@ -183,6 +242,7 @@ class EmojiView @JvmOverloads constructor(
                     /* y = */ baselineY,
                     textPaint,
                 )
+                textPaint.clearShadowLayer()
             }
 
             if (drawVariantIndicator) {

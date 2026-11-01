@@ -10,4 +10,9 @@
     <string name="custom_suggestion_theme_text_color">Color del texto de sugerencias</string>
     <string name="custom_suggestion_theme_bar_color">Color de fondo de la barra</string>
     <string name="custom_suggestion_theme_reset_color">Usar color predeterminado del tema</string>
+    <string name="custom_key_label_scale">Tamaño de letras y números de las teclas</string>
+    <string name="custom_key_label_scale_desc">Escala letras, números y pistas secundarias sin cambiar el tamaño de las teclas.</string>
+    <string name="custom_emoji_cell_size">Tamaño de emojis y emoticones</string>
+    <string name="custom_emoji_cell_size_desc">Ajusta las celdas de emojis, emoticones ASCII y sugerencias de emojis.</string>
+    <string name="custom_emoji_relief">Relieve 3D para emojis y emoticones</string>
 </resources>

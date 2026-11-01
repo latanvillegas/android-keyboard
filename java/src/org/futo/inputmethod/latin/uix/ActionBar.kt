@@ -382,10 +382,15 @@ fun RowScope.SuggestionItem(words: SuggestedWords, idx: Int, isPrimary: Boolean,
         }
     }
 
+    val emojiRatio = if (isEmoji) {
+        useDataStoreValue(EmojiCellSizeSetting).coerceIn(28, 72) / 42.0f
+    } else {
+        1.0f
+    }
     val textStyle = adjustableSuggestionStyle(when(isAutocorrect) {
         true -> suggestionStylePrimary
         false -> suggestionStyleAlternative
-    }).copy(color = color).withCustomFont(potentiallyCompatEmojiFont)
+    }, ratio = emojiRatio).copy(color = color).withCustomFont(potentiallyCompatEmojiFont)
 
     Box(
         modifier = textButtonModifier

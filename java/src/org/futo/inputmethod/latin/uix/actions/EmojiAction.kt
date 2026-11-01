@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -108,6 +109,8 @@ import org.futo.inputmethod.latin.uix.DialogRequestItem
 import org.futo.inputmethod.latin.uix.EmojiTracker.getRecentEmojis
 import org.futo.inputmethod.latin.uix.EmojiTracker.resetRecentEmojis
 import org.futo.inputmethod.latin.uix.EmojiTracker.useEmoji
+import org.futo.inputmethod.latin.uix.EmojiCellSizeSetting
+import org.futo.inputmethod.latin.uix.EmojiReliefSetting
 import org.futo.inputmethod.latin.uix.LocalKeyboardScheme
 import org.futo.inputmethod.latin.uix.LocalManager
 import org.futo.inputmethod.latin.uix.PersistentActionState
@@ -237,6 +240,7 @@ class EmojiGridAdapter(
     private val contentColor: Color,
     private val rippleColor: Color,
     private val emojiTypeface: Typeface?,
+    private val raisedEmojiStyle: Boolean,
     var wideCellWidth: Float
 ) : ListAdapter<EmojiViewItem, RecyclerView.ViewHolder>(EmojiViewItemDiffCallback) {
 
@@ -264,6 +268,7 @@ class EmojiGridAdapter(
 
             emojiView.setTextColor(color)
             emojiView.setTextSizeMultiplier(sizeMultiplier)
+            emojiView.setRaisedStyle(raisedEmojiStyle)
             emojiView.emoji = emoji
             emojiView.setOnClickListener {
                 it.sendAccessibilityEvent(AccessibilityEvent.TYPE_ANNOUNCEMENT)
@@ -379,10 +384,10 @@ fun Emojis(
     currentCategory: MutableState<CategoryItem>,
     jumpCategory: MutableState<CategoryItem?>
 ) {
+    val emojiCellDp = useDataStoreValue(EmojiCellSizeSetting).coerceIn(28, 72)
+    val raisedEmojiStyle = useDataStoreValue(EmojiReliefSetting)
     val emojiWidth = with(LocalDensity.current) {
-        remember {
-            42.dp.toPx().roundToInt()
-        }
+        emojiCellDp.dp.toPx().roundToInt().coerceAtLeast(1)
     }
 
     val lastUsedSkinTone = useDataStore(LastUsedSkinTone)
@@ -395,7 +400,7 @@ fun Emojis(
     var wideEmojiWidth by remember { mutableIntStateOf(100) }
     val emojiTypeface = LocalCompatEmojiTypeface.current
     val rippleColor = LocalKeyboardScheme.current.keyboardContainerPressed
-    val emojiAdapter = remember {
+    val emojiAdapter = remember(emojiWidth, color, rippleColor, emojiTypeface, raisedEmojiStyle) {
         EmojiGridAdapter(
             onClick = onClick,
             onSelectSkinTone = {
@@ -406,11 +411,12 @@ fun Emojis(
             contentColor = color,
             wideCellWidth = wideEmojiWidth / 100.0f,
             emojiTypeface = emojiTypeface,
+            raisedEmojiStyle = raisedEmojiStyle,
             rippleColor = rippleColor
         )
     }
 
-    LaunchedEffect(emojis) {
+    LaunchedEffect(emojis, emojiAdapter) {
         emojiAdapter.submitList(emojis)
     }
 
@@ -424,6 +430,9 @@ fun Emojis(
 
 
     Box(modifier = modifier) {
+        // Recreate the recycler when geometry or relief changes; the span
+        // lookup belongs to this adapter instance.
+        key(emojiWidth, raisedEmojiStyle, color, rippleColor, emojiTypeface) {
         AndroidView(
             factory = { context ->
                 RecyclerView(context).apply {
@@ -467,10 +476,10 @@ fun Emojis(
             },
             update = {
                 if (viewWidth > 0) {
-                    val spanCount = (viewWidth / emojiWidth)
+                    val spanCount = (viewWidth / emojiWidth).coerceAtLeast(1)
                     val wideSpanCount = (spanCount / 2 + 1).coerceAtLeast(2)
                     val newWideCellWidth = ((spanCount.toFloat() / wideSpanCount.toFloat()) * 100.0f).toInt()
-                    (it.layoutManager as GridLayoutManager).spanCount = (viewWidth / emojiWidth) * 100
+                    (it.layoutManager as GridLayoutManager).spanCount = spanCount * 100
                     if(wideEmojiWidth != newWideCellWidth) {
                         wideEmojiWidth = newWideCellWidth
                         emojiAdapter.wideCellWidth = newWideCellWidth / 100.0f
@@ -517,6 +526,7 @@ fun Emojis(
                 }
                 .padding(8.dp, 0.dp)
         )
+        }
 
         Box(Modifier.matchParentSize().background(
             MaterialTheme.colorScheme.background.copy(alpha = blockerAlpha * 0.5f)

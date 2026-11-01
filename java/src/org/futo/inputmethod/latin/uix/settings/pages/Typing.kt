@@ -101,6 +101,9 @@ import org.futo.inputmethod.latin.uix.KeyHintsSetting
 import org.futo.inputmethod.latin.uix.SuggestionBarHeightSetting
 import org.futo.inputmethod.latin.uix.SuggestionFontSizeSetting
 import org.futo.inputmethod.latin.uix.ActionIconScaleSetting
+import org.futo.inputmethod.latin.uix.KeyLabelScaleSetting
+import org.futo.inputmethod.latin.uix.EmojiCellSizeSetting
+import org.futo.inputmethod.latin.uix.EmojiReliefSetting
 import org.futo.inputmethod.latin.uix.LocalKeyboardScheme
 import org.futo.inputmethod.latin.uix.SHOW_EMOJI_SUGGESTIONS
 import org.futo.inputmethod.latin.uix.SettingsKey
@@ -263,6 +266,29 @@ fun ResizeScreen(navController: NavHostController = rememberNavController()) {
                 hardRange = 0.2f..5.0f,
                 transform = { it },
                 indicator = { "%.2f×".format(it) }
+            )
+
+            SettingSlider(
+                title = stringResource(R.string.custom_key_label_scale),
+                subtitle = stringResource(R.string.custom_key_label_scale_desc),
+                setting = KeyLabelScaleSetting,
+                range = 0.6f..1.8f,
+                hardRange = 0.5f..2.2f,
+                transform = { it },
+                indicator = { "${(it * 100f).roundToInt()}%" }
+            )
+            SettingSlider(
+                title = stringResource(R.string.custom_emoji_cell_size),
+                subtitle = stringResource(R.string.custom_emoji_cell_size_desc),
+                setting = EmojiCellSizeSetting,
+                range = 28.0f..72.0f,
+                hardRange = 28.0f..72.0f,
+                transform = { it.roundToInt() },
+                indicator = { "$it dp" }
+            )
+            PrimarySettingToggleDataStoreItem(
+                stringResource(R.string.custom_emoji_relief),
+                useDataStore(EmojiReliefSetting)
             )
 
             AndroidTextInput(allowPredictions = false, customOptions = setOf("org.futo.inputmethod.latin.ResizeMode"), autoshow = false)

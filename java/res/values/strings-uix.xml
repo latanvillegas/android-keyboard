@@ -723,4 +723,9 @@ Default is %1$s</string>
     <string name="custom_suggestion_theme_text_color">Suggestion text color</string>
     <string name="custom_suggestion_theme_bar_color">Suggestion bar background</string>
     <string name="custom_suggestion_theme_reset_color">Use default theme color</string>
+    <string name="custom_key_label_scale">Key letters, numbers and hint size</string>
+    <string name="custom_key_label_scale_desc">Scale key lettering and number hints without changing key dimensions.</string>
+    <string name="custom_emoji_cell_size">Emoji and emoticon size</string>
+    <string name="custom_emoji_cell_size_desc">Resize emoji picker cells, ASCII emoticons and emoji predictions.</string>
+    <string name="custom_emoji_relief">3D relief for emojis and emoticons</string>
 </resources>
