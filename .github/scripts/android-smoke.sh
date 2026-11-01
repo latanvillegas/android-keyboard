@@ -32,7 +32,8 @@ check_orientation() {
   for attempt in $(seq 1 20); do
     adb shell dumpsys input_method > "android-evidence/ime-$label.txt"
     if grep -Fq "mCurMethodId=$ime" "android-evidence/ime-$label.txt" &&
-       grep -Eq '^[[:space:]]*mInputShown=true' "android-evidence/ime-$label.txt"; then
+       grep -Eq '^[[:space:]]*mInputShown=true' "android-evidence/ime-$label.txt" &&
+       grep -Eq '^[[:space:]]*mIsInputViewShown=true' "android-evidence/ime-$label.txt"; then
       shown=1
       break
     fi
@@ -47,6 +48,9 @@ check_orientation() {
     sleep 2
   done
 
+  # The IME window may still be compositing after being marked visible.
+  if [[ "$shown" == 1 ]]; then sleep 2; fi
+  adb shell dumpsys input_method > "android-evidence/ime-$label.txt"
   adb shell dumpsys activity activities > "android-evidence/activity-$label.txt"
   adb exec-out screencap -p > "android-evidence/keyboard-$label.png"
   if [[ "$shown" != 1 ]]; then
