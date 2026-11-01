@@ -181,15 +181,24 @@ private fun adjustableSuggestionStyle(base: TextStyle, ratio: Float = 1.0f): Tex
 }
 
 @Composable
+private fun themedActionIconSize(action: Action, defaultSize: Dp): Dp {
+    val theme = LocalKeyboardScheme.current.extended.advancedThemeOptions
+    val hasCustomMic = action.icon == R.drawable.mic_fill && theme.actionMicIcon != null
+    val userScale = useDataStoreValue(ActionIconScaleSetting)
+        .takeIf { it.isFinite() }?.coerceIn(0.2f, 5.0f) ?: 1.0f
+    val themeScale = if (hasCustomMic) {
+        theme.actionMicIconScale.takeIf { it.isFinite() }?.coerceIn(0.2f, 5.0f) ?: 1.0f
+    } else 1.0f
+    val availableHeight = (adjustableActionBarHeight().value - 4.0f).coerceAtLeast(4.0f)
+    return (defaultSize.value * userScale * themeScale)
+        .coerceIn(4.0f, minOf(96.0f, availableHeight)).dp
+}
+
+@Composable
 private fun ThemedActionIcon(action: Action, defaultSize: Dp, tint: Color) {
     val theme = LocalKeyboardScheme.current.extended.advancedThemeOptions
     val mic = if (action.icon == R.drawable.mic_fill) theme.actionMicIcon else null
-    val userScale = useDataStoreValue(ActionIconScaleSetting)
-        .takeIf { it.isFinite() }?.coerceIn(0.2f, 5.0f) ?: 1.0f
-    val themeScale = if (mic != null) {
-        theme.actionMicIconScale.takeIf { it.isFinite() }?.coerceIn(0.2f, 5.0f) ?: 1.0f
-    } else 1.0f
-    val size = (defaultSize.value * userScale * themeScale).coerceIn(4.0f, 96.0f).dp
+    val size = themedActionIconSize(action, defaultSize)
     Icon(
         painter = mic?.let { BitmapPainter(it) } ?: painterResource(id = action.icon),
         contentDescription = stringResource(action.name),
@@ -571,7 +580,7 @@ fun RowScope.SuggestionItems(words: SuggestedWords, onClick: (i: Int) -> Unit, o
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LazyItemScope.ActionItem(idx: Int, action: Action, onSelect: (Action) -> Unit, onLongSelect: (Action) -> Unit) {
-    val width = 56.dp
+    val width = maxOf(56.dp, themedActionIconSize(action, 20.dp) + 12.dp)
 
     val modifier = Modifier
         .width(width)
@@ -594,12 +603,13 @@ fun ActionItemSmall(action: Action, onSelect: (Action) -> Unit, onLongSelect: (A
     val bgCol = LocalKeyboardScheme.current.keyboardContainer
     val fgCol = LocalKeyboardScheme.current.onKeyboardContainer
 
+    val width = maxOf(42.dp, themedActionIconSize(action, 16.dp) + 8.dp)
     val circleRadius = with(LocalDensity.current) {
-        16.dp.toPx()
+        maxOf(16.dp, width / 2f - 4.dp).toPx()
     }
 
     Box(modifier = Modifier
-        .width(42.dp)
+        .width(width)
         .fillMaxHeight()
         .drawBehind {
             drawCircle(
