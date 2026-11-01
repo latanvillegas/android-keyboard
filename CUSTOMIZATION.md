@@ -25,3 +25,34 @@ SVG input is not supported by the existing bitmap decoder; use PNG.
 
 Validation required: native build, portrait/landscape, split/floating/one-handed,
 long suggestions, ZIP import/export, rotation and IME/inset behavior.
+
+## Suggested words bar: local sizing and theme appearance
+
+The prediction font size is editable in **Keyboard settings**, and the same
+setting remains available under **Resize**. It ranges from 8 to 144 sp, and
+defaults to 18 sp. Changing it does not resize key labels or keyboard geometry.
+
+The built-in **Create custom theme** editor now has three new controls:
+suggestion font scale (50–300% of the user's chosen size), suggestion text
+color, and suggestion bar background. A reset button on each color picker
+restores the underlying theme's own palette. The preview uses the real action
+bar and the saved JSON theme ZIP persists the options.
+
+Optional values for third-party TOML theme ZIPs:
+
+```toml
+[options]
+suggestion_font_scale = 1.25
+suggestion_text_color = "#FFFFFFFF"
+suggestion_bar_color = "#101124FF"
+suggestion_divider_color = "#00D8FFFF"
+```
+
+TOML hex colors use RGBA order, matching the existing theme parser. JSON
+equivalents are `suggestionFontScale`, `suggestionTextColor`,
+`suggestionBarColor` and `suggestionDividerColor`. Missing attributes
+leave existing themes unchanged. Invalid non-finite scale values fall back to
+1.0, and rendered prediction text size is clamped to 4–144 sp.
+
+The public FUTO-hosted web theme editor is not part of this fork: these
+controls are in the **in-app theme editor** and imported theme files.
