@@ -70,6 +70,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -387,10 +388,17 @@ fun RowScope.SuggestionItem(words: SuggestedWords, idx: Int, isPrimary: Boolean,
     } else {
         1.0f
     }
+    val raisedEmojiStyle = useDataStoreValue(EmojiReliefSetting)
+    val emojiShadow = if (isEmoji && raisedEmojiStyle) {
+        Shadow(color = Color.Black.copy(alpha = 0.45f), offset = Offset(1.5f, 2.0f), blurRadius = 3.0f)
+    } else {
+        null
+    }
     val textStyle = adjustableSuggestionStyle(when(isAutocorrect) {
         true -> suggestionStylePrimary
         false -> suggestionStyleAlternative
-    }, ratio = emojiRatio).copy(color = color).withCustomFont(potentiallyCompatEmojiFont)
+    }, ratio = emojiRatio).copy(color = color, shadow = emojiShadow)
+        .withCustomFont(potentiallyCompatEmojiFont)
 
     Box(
         modifier = textButtonModifier
