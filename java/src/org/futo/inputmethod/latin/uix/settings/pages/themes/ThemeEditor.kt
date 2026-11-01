@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.view.ContextThemeWrapper
+import com.google.android.material.color.utilities.Hct
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.rememberTransformableState
@@ -206,6 +207,11 @@ internal fun ThemeEditor(
     var darkMode by remember { mutableStateOf(startingColor.tone < 50f) }
 
     var borders by remember { mutableStateOf(false) }
+    var suggestionFontScale by remember { mutableFloatStateOf(1.0f) }
+    var suggestionTextColor by remember { mutableStateOf<Color?>(null) }
+    var suggestionBarColor by remember { mutableStateOf<Color?>(null) }
+    var suggestionTextHct by remember { mutableStateOf(Hct2(startingColor.hue, 5f, 92f)) }
+    var suggestionBarHct by remember { mutableStateOf(Hct2(startingColor.hue, 30f, 15f)) }
 
     var color by remember { mutableStateOf(Hct2(startingColor.hue, startingColor.chroma, 0f)) }
 
@@ -256,7 +262,11 @@ internal fun ThemeEditor(
         }
     }
 
-    val themeCfg by rememberDelayedRecomputed(color, opacity, darkMode, borders, delay=computeDelay) {
+    val themeCfg by rememberDelayedRecomputed(
+        color, opacity, darkMode, borders,
+        suggestionFontScale, suggestionTextColor, suggestionBarColor,
+        delay = computeDelay
+    ) {
         CustomThemeBuilderConfiguration(
             hue = color.hue.toDouble(),
             chroma = color.chroma.toDouble(),
@@ -265,7 +275,10 @@ internal fun ThemeEditor(
             borders = borders,
             // we don't specify it here to skip constantly reloading image
             backgroundImagePath = "",
-            backgroundImageOpacity = opacity
+            backgroundImageOpacity = opacity,
+            suggestionFontScale = suggestionFontScale,
+            suggestionTextColor = suggestionTextColor,
+            suggestionBarColor = suggestionBarColor
         )
     }
 
@@ -380,6 +393,56 @@ internal fun ThemeEditor(
                 }
             ),
 
+            Tool(
+                R.string.custom_suggestion_theme_font_scale, R.drawable.maximize,
+                tool = @Composable {
+                    SettingSliderForDataStoreItem(
+                        stringResource(R.string.custom_suggestion_theme_font_scale),
+                        remember(suggestionFontScale) {
+                            DataStoreItem(
+                                value = suggestionFontScale,
+                                setValue = { suggestionFontScale = it }
+                            )
+                        },
+                        default = 1.0f,
+                        range = 0.5f..3.0f,
+                        transform = { it },
+                        indicator = { "${(it * 100f).roundToInt()}%" }
+                    )
+                }
+            ),
+            Tool(
+                R.string.custom_suggestion_theme_text_color, R.drawable.themes,
+                tool = @Composable {
+                    Column {
+                        HctSliderPicker(suggestionTextHct) {
+                            suggestionTextHct = it
+                            suggestionTextColor = Color(Hct.from(
+                                it.hue.toDouble(), it.chroma.toDouble(), it.tone.toDouble()
+                            ).toInt())
+                        }
+                        Button(onClick = { suggestionTextColor = null }) {
+                            Text(stringResource(R.string.custom_suggestion_theme_reset_color))
+                        }
+                    }
+                }
+            ),
+            Tool(
+                R.string.custom_suggestion_theme_bar_color, R.drawable.key_border,
+                tool = @Composable {
+                    Column {
+                        HctSliderPicker(suggestionBarHct) {
+                            suggestionBarHct = it
+                            suggestionBarColor = Color(Hct.from(
+                                it.hue.toDouble(), it.chroma.toDouble(), it.tone.toDouble()
+                            ).toInt())
+                        }
+                        Button(onClick = { suggestionBarColor = null }) {
+                            Text(stringResource(R.string.custom_suggestion_theme_reset_color))
+                        }
+                    }
+                }
+            ),
             Tool(
                 R.string.theme_customizer_color_sliders_name, R.drawable.themes,
                 tool = @Composable {
