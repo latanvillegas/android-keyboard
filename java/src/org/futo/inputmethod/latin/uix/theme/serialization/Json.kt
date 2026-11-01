@@ -212,6 +212,10 @@ data class SerializableJsonTheme(
     val keysFont: String? = null,
     val actionMicIcon: String? = null,
     val actionMicIconScale: Float = 1.0f,
+    val suggestionFontScale: Float = 1.0f,
+    val suggestionTextColor: SerializableJsonColor? = null,
+    val suggestionBarColor: SerializableJsonColor? = null,
+    val suggestionDividerColor: SerializableJsonColor? = null,
 
     val name: String? = null,
     val id: String? = null,
@@ -304,6 +308,10 @@ data class SerializableJsonTheme(
                     font = decodeOptionalFont(ctx, keysFont),
                     actionMicIcon = decodeOptionalImage(ctx, actionMicIcon),
                     actionMicIconScale = actionMicIconScale,
+                    suggestionFontScale = suggestionFontScale,
+                    suggestionTextColor = suggestionTextColor?.toColor(),
+                    suggestionBarColor = suggestionBarColor?.toColor(),
+                    suggestionDividerColor = suggestionDividerColor?.toColor(),
 
                     themeName = name,
                     themeAuthor = author
