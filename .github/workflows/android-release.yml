@@ -1,0 +1,174 @@
+name: Build FUTO Stable Release APK
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/android-release.yml"
+      - "java/**"
+      - "common/**"
+      - "native/**"
+      - "voiceinput-shared/**"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradle.properties"
+      - ".gitmodules"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: futo-stable-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stable-release:
+    name: Compile, sign and verify Stable Release APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          lfs: false
+
+      - name: Fetch pinned upstream submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule sync --recursive
+          git -c protocol.version=2 submodule update --init --depth 1 --jobs 4 -- \
+            libs \
+            translations \
+            java/assets/layouts \
+            java/assets/themes \
+            java/res-large \
+            voiceinput-shared/src/main/ml
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK and NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Configure production signing if secrets exist
+        id: signing
+        shell: bash
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$RELEASE_KEYSTORE_BASE64" ]]; then
+            if [[ -z "$RELEASE_KEY_ALIAS" || -z "$RELEASE_KEY_PASSWORD" || -z "$RELEASE_STORE_PASSWORD" ]]; then
+              echo "::error::All four release signing secrets must be configured."
+              exit 1
+            fi
+            printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release-signing.jks"
+            chmod 600 "$RUNNER_TEMP/release-signing.jks"
+            python3 - <<'PY'
+          import os
+          from pathlib import Path
+          def escape_prop(v):
+              result = v.replace(chr(92), chr(92) + chr(92))
+              result = result.replace(chr(10), chr(92) + 'n')
+              result = result.replace(chr(13), chr(92) + 'r')
+              result = result.replace('=', chr(92) + '=')
+              result = result.replace(':', chr(92) + ':')
+              result = result.replace(' ', chr(92) + ' ')
+              return result
+          values = {
+              'storeFile': str(Path(os.environ['RUNNER_TEMP']) / 'release-signing.jks'),
+              'storePassword': os.environ['RELEASE_STORE_PASSWORD'],
+              'keyPassword': os.environ['RELEASE_KEY_PASSWORD'],
+              'keyAlias': os.environ['RELEASE_KEY_ALIAS'],
+          }
+          Path('keystore.properties').write_text(
+              ''.join(k + '=' + escape_prop(v) + chr(10) for k, v in values.items()),
+              encoding='utf-8'
+          )
+          PY
+            echo "kind=production-signed" >> "$GITHUB_OUTPUT"
+            echo "SIGNING_KIND=production-signed" >> "$GITHUB_ENV"
+          else
+            if [[ -n "$RELEASE_KEY_ALIAS" || -n "$RELEASE_KEY_PASSWORD" || -n "$RELEASE_STORE_PASSWORD" ]]; then
+              echo "::error::Signing secrets are incomplete."
+              exit 1
+            fi
+            test -f java/shared.keystore
+            echo "::warning::Stable Release uses DEVELOPMENT signing; do not publish as a production update."
+            echo "kind=test-signed" >> "$GITHUB_OUTPUT"
+            echo "SIGNING_KIND=test-signed" >> "$GITHUB_ENV"
+          fi
+
+      - name: Assemble optimized Stable Release APK
+        shell: bash
+        env:
+          VERSION_NAME: fork-stable-${{ github.run_number }}
+          VERSION_CODE: ${{ github.run_number }}
+          BRANCH_NAME: master
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace --warning-mode summary assembleStableRelease
+
+      - name: Verify APK signature, contents and SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="$(find build/outputs/apk/stable/release -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          if [[ -z "$apk" || ! -s "$apk" ]]; then
+            echo "::error::No Stable Release APK was produced."
+            exit 1
+          fi
+          mkdir -p release-dist
+          cp "$apk" release-dist/futo-keyboard-stable-release.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs \
+            release-dist/futo-keyboard-stable-release.apk | tee release-dist/apk-signature.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging \
+            release-dist/futo-keyboard-stable-release.apk | head -n 20 \
+            | tee release-dist/apk-manifest.txt
+          unzip -t release-dist/futo-keyboard-stable-release.apk \
+            | tail -n 1 | tee release-dist/zip-integrity.txt
+          (cd release-dist && sha256sum futo-keyboard-stable-release.apk) \
+            | tee release-dist/SHA256SUMS
+          printf '%s\n' \
+            "commit=$GITHUB_SHA" \
+            "workflow_run=$GITHUB_RUN_ID" \
+            "variant=stableRelease" \
+            "signing=$SIGNING_KIND" \
+            > release-dist/BUILD-INFO.txt
+
+      - name: Publish Stable Release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: futo-keyboard-stable-release-${{ steps.signing.outputs.kind }}
+          path: release-dist/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove signing materials
+        if: always()
+        shell: bash
+        run: |
+          rm -f keystore.properties "$RUNNER_TEMP/release-signing.jks"
