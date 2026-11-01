@@ -176,7 +176,10 @@ private fun adjustableActionBarHeight(): Dp =
 
 @Composable
 private fun adjustableSuggestionStyle(base: TextStyle, ratio: Float = 1.0f): TextStyle {
-    val fontSize = useDataStoreValue(SuggestionFontSizeSetting).coerceIn(8, 144) * ratio
+    val rawScale = LocalKeyboardScheme.current.extended.advancedThemeOptions.suggestionFontScale
+    val themeScale = rawScale.takeIf { it.isFinite() }?.coerceIn(0.5f, 3.0f) ?: 1.0f
+    val fontSize = (useDataStoreValue(SuggestionFontSizeSetting).coerceIn(8, 144) * themeScale * ratio)
+        .coerceIn(4.0f, 144.0f)
     return base.copy(fontSize = fontSize.sp, lineHeight = (fontSize * 1.4f).sp)
 }
 
@@ -265,7 +268,8 @@ val suggestionStyleCandidateDescription = TextStyle(
 
 @Composable
 fun actionBarColor(): Color =
-    if(LocalInspectionMode.current) {
+    LocalKeyboardScheme.current.extended.advancedThemeOptions.suggestionBarColor
+        ?: if(LocalInspectionMode.current) {
         LocalKeyboardScheme.current.keyboardSurface
     } else if(LocalKeyboardScheme.current.extended.advancedThemeOptions.backgroundImage != null) {
         LocalKeyboardScheme.current.keyboardSurface.copy(alpha = LocalKeyboardScheme.current.extended.advancedThemeOptions.actionBarOpacity)
@@ -338,10 +342,11 @@ fun RowScope.SuggestionItem(words: SuggestedWords, idx: Int, isPrimary: Boolean,
 
     val isAutocorrect = forcePrimary || (isPrimary && words.mWillAutoCorrect)
 
-    val color = when(isAutocorrect) {
-        true -> LocalKeyboardScheme.current.onSurface
-        else -> LocalKeyboardScheme.current.onSurfaceVariant
-    }
+    val color = LocalKeyboardScheme.current.extended.advancedThemeOptions.suggestionTextColor
+        ?: when(isAutocorrect) {
+            true -> LocalKeyboardScheme.current.onSurface
+            else -> LocalKeyboardScheme.current.onSurfaceVariant
+        }
 
     val iconToUse = when {
         wordInfo?.mOriginatesFromTransformerLM == true -> painterResource(id = R.drawable.transformer_suggestion)
@@ -414,7 +419,8 @@ fun RowScope.SuggestionItem(words: SuggestedWords, idx: Int, isPrimary: Boolean,
         modifier = Modifier
             .fillMaxHeight(0.66f)
             .align(CenterVertically)
-            .background(color = LocalKeyboardScheme.current.outline)
+            .background(color = LocalKeyboardScheme.current.extended.advancedThemeOptions.suggestionDividerColor
+                ?: LocalKeyboardScheme.current.outline)
             .width(1.dp)
     )
 }
@@ -1109,7 +1115,8 @@ class ExampleListener : SuggestionStripViewListener {
 private fun CandidateItem(modifier: Modifier, it: SuggestedWordInfo, listener: SuggestionStripViewListener, width: Dp, last: Boolean = false) {
     val word = it.mWord
     val description = it.mCandidateDescription
-    val color = LocalKeyboardScheme.current.onSurface
+    val color = LocalKeyboardScheme.current.extended.advancedThemeOptions.suggestionTextColor
+        ?: LocalKeyboardScheme.current.onSurface
     val textStyle =
         adjustableSuggestionStyle(suggestionStylePrimary).copy(color = color).withCustomFont()
     val descTextStyle =
