@@ -1,0 +1,137 @@
+name: Verify FUTO Android APK and keyboard modes
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/android-verify.yml"
+      - ".github/scripts/android-smoke.sh"
+      - "tests/**"
+      - "java/**"
+      - "voiceinput-shared/**"
+      - "common/**"
+      - "native/**"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradle.properties"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-verify-master
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compile unstable debug APK and instrumentation APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          lfs: false
+
+      - name: Fetch pinned upstream dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule sync --recursive
+          git -c protocol.version=2 submodule update --init --depth 1 --jobs 4 -- \
+            libs \
+            translations \
+            java/assets/layouts \
+            java/assets/themes \
+            java/res-large \
+            voiceinput-shared/src/main/ml
+          git submodule status
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35 and exact NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build application and instrumentation APKs
+        env:
+          VERSION_NAME: fork-verify
+          VERSION_CODE: '1026001'
+          BRANCH_NAME: master
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace --warning-mode summary \
+            assembleUnstableDebug assembleUnstableDebugAndroidTest
+          find build/outputs/apk -type f -name '*.apk' -print | sort
+
+      - name: SHA-256 for reproducibility and integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          find build/outputs/apk -type f -name '*.apk' -print0 | \
+            sort -z | xargs -0 -r sha256sum | tee apk-sha256.txt
+
+      - name: Upload APKs only after a successful build
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-debug-apks
+          path: |
+            build/outputs/apk/**/*.apk
+            apk-sha256.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  emulator:
+    name: Android 35 portrait landscape split floating smoke tests
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-debug-apks
+          path: verified-apks
+      - name: Enable KVM acceleration
+        shell: bash
+        run: |
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+          fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          cores: 2
+          ram-size: 3072M
+          heap-size: 512M
+          emulator-options: -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect -camera-back none
+          script: bash .github/scripts/android-smoke.sh
+      - name: Upload screenshots and instrumentation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-evidence
+          path: android-evidence/
+          if-no-files-found: warn
+          retention-days: 14
