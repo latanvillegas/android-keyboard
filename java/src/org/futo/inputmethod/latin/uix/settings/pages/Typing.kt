@@ -832,6 +832,18 @@ val KeyboardSettingsMenu = UserSettingsMenu(
             navigateTo = "resize",
             icon = R.drawable.maximize
         ),
+        // This is the same DataStore setting shown on ResizeScreen.
+        UserSetting(name = R.string.custom_suggestion_font_size) {
+            SettingSlider(
+                title = stringResource(R.string.custom_suggestion_font_size),
+                subtitle = stringResource(R.string.custom_suggestion_font_size_desc),
+                setting = SuggestionFontSizeSetting,
+                range = 12.0f..56.0f,
+                hardRange = 8.0f..144.0f,
+                transform = { it.roundToInt() },
+                indicator = { "$it sp" }
+            )
+        },
         userSettingToggleSharedPrefs(
             title = R.string.keyboard_settings_show_number_row,
             subtitle = R.string.keyboard_settings_show_number_row_subtitle,
