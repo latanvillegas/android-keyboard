@@ -719,4 +719,8 @@ Default is %1$s</string>
     <string name="custom_suggestion_font_size_desc">Control predicted word size independently of key labels (sp).</string>
     <string name="custom_action_icon_scale">Action icon scale</string>
     <string name="custom_action_icon_scale_desc">Resize microphone and toolbar icons without changing key size.</string>
+    <string name="custom_suggestion_theme_font_scale">Suggestion font scale (theme)</string>
+    <string name="custom_suggestion_theme_text_color">Suggestion text color</string>
+    <string name="custom_suggestion_theme_bar_color">Suggestion bar background</string>
+    <string name="custom_suggestion_theme_reset_color">Use default theme color</string>
 </resources>
