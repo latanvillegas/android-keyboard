@@ -671,7 +671,7 @@ internal fun ThemeEditor(
 
                     activeTool?.tool?.invoke()
 
-                    FlowRow(Modifier.background(Color.Black, RoundedCornerShape(16.dp)).padding(8.dp).height(48.dp)) {
+                    FlowRow(Modifier.background(Color.Black, RoundedCornerShape(16.dp)).padding(8.dp)) {
                         var toolEndReached = false
                         tools.forEach {
                             if(it.tool == null && !toolEndReached) {
