@@ -95,10 +95,17 @@ object ZipThemes {
             })
         }
 
+        val exportedAssets = hashSetOf<String>()
         val putFile = { filename: String ->
-            putEntry(filename)
-            zos.write(ctx.getFileBytes(filename)!!)
-            zos.closeEntry()
+            // Inline data URIs are already embedded in config.json. Do not write
+            // them as ZIP entries or duplicate shared key/microphone assets.
+            if (!filename.startsWith("data:image") && exportedAssets.add(filename)) {
+                val bytes = ctx.getFileBytes(filename)
+                    ?: throw FileNotFoundException("Theme asset not found: $filename")
+                putEntry(filename)
+                zos.write(bytes)
+                zos.closeEntry()
+            }
         }
 
         putEntry(versionFileName)
