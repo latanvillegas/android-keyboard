@@ -55,6 +55,9 @@ jobs:
           java-version: '17'
 
       - uses: android-actions/setup-android@v3
+        with:
+          # Upstream default requests the retired SDK package "tools".
+          packages: platform-tools
 
       - name: Install Android SDK 35 and exact NDK
         shell: bash
