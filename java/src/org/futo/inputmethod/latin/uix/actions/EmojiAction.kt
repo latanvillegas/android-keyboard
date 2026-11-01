@@ -249,7 +249,8 @@ class EmojiGridAdapter(
         rippleColor: Int,
         emojiTypeface: Typeface?,
         width: Int,
-        height: Int
+        height: Int,
+        private val raisedEmojiStyle: Boolean
     ) : RecyclerView.ViewHolder(EmojiView(context, rippleColor, emojiTypeface)) {
         private val emojiView: EmojiView = (itemView as EmojiView).apply {
             layoutParams = ViewGroup.LayoutParams(width, height)
@@ -301,7 +302,11 @@ class EmojiGridAdapter(
     @UiThread
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         return when (viewType) {
-            VIEW_EMOJI -> EmojiViewHolder(parent.context, width = emojiCellWidth, height = emojiCellWidth, rippleColor = rippleColor.toArgb(), emojiTypeface = emojiTypeface)
+            VIEW_EMOJI -> EmojiViewHolder(
+                parent.context, width = emojiCellWidth, height = emojiCellWidth,
+                rippleColor = rippleColor.toArgb(), emojiTypeface = emojiTypeface,
+                raisedEmojiStyle = raisedEmojiStyle
+            )
             VIEW_CATEGORY -> CategoryViewHolder(LayoutInflater.from(parent.context).inflate(R.layout.emoji_category, parent, false))
             else -> throw RuntimeException("Unknown viewType $viewType")
         }
