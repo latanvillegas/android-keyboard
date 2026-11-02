@@ -117,6 +117,7 @@ import org.futo.inputmethod.latin.uix.PersistentActionState
 import org.futo.inputmethod.latin.uix.SettingsKey
 import org.futo.inputmethod.latin.uix.actions.emoji.EmojiItem
 import org.futo.inputmethod.latin.uix.actions.emoji.EmojiView
+import org.futo.inputmethod.latin.uix.actions.emoji.FluentEmoji3DImage
 import org.futo.inputmethod.latin.uix.settings.useDataStore
 import org.futo.inputmethod.latin.uix.settings.useDataStoreValue
 import org.futo.inputmethod.latin.uix.theme.LocalCompatEmojiFamily
@@ -598,12 +599,24 @@ fun Emojis(
                                                 }
                                             }
                                     ) {
-                                        Text(
-                                            emoji, modifier = Modifier.align(Alignment.Center),
-                                            fontFamily = familyToUse,
-                                            fontSize = with(LocalDensity.current) {
-                                                32.dp.toSp()
-                                            })
+                                        FluentEmoji3DImage(
+                                            emoji = emoji,
+                                            enabled = raisedEmojiStyle,
+                                            category = popupInfo.emoji.category,
+                                            description = popupInfo.emoji.description,
+                                            modifier = Modifier
+                                                .align(Alignment.Center)
+                                                .size(36.dp)
+                                        ) {
+                                            Text(
+                                                emoji,
+                                                modifier = Modifier.align(Alignment.Center),
+                                                fontFamily = familyToUse,
+                                                fontSize = with(LocalDensity.current) {
+                                                    32.dp.toSp()
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
