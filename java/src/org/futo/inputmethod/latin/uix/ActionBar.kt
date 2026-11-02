@@ -70,7 +70,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -133,6 +132,7 @@ import org.futo.inputmethod.latin.uix.theme.LocalCompatEmojiTypeface
 import org.futo.inputmethod.latin.uix.theme.ThemeOption
 import org.futo.inputmethod.latin.uix.theme.Typography
 import org.futo.inputmethod.latin.uix.theme.UixThemeWrapper
+import org.futo.inputmethod.latin.uix.actions.emoji.FluentEmoji3DImage
 import org.futo.inputmethod.latin.uix.theme.emojiNeedsCompat
 import org.futo.inputmethod.latin.uix.theme.presets.DefaultDarkScheme
 import org.futo.inputmethod.latin.uix.theme.presets.DynamicDarkTheme
@@ -389,15 +389,14 @@ fun RowScope.SuggestionItem(words: SuggestedWords, idx: Int, isPrimary: Boolean,
         1.0f
     }
     val raisedEmojiStyle = useDataStoreValue(EmojiReliefSetting)
-    val emojiShadow = if (isEmoji && raisedEmojiStyle) {
-        Shadow(color = Color.Black.copy(alpha = 0.45f), offset = Offset(1.5f, 2.0f), blurRadius = 3.0f)
-    } else {
-        null
-    }
+    val emojiSize = minOf(
+        useDataStoreValue(EmojiCellSizeSetting).coerceIn(28, 72).dp,
+        adjustableActionBarHeight() - 4.dp
+    ).coerceAtLeast(12.dp)
     val textStyle = adjustableSuggestionStyle(when(isAutocorrect) {
         true -> suggestionStylePrimary
         false -> suggestionStyleAlternative
-    }, ratio = emojiRatio).copy(color = color, shadow = emojiShadow)
+    }, ratio = emojiRatio).copy(color = color)
         .withCustomFont(potentiallyCompatEmojiFont)
 
     Box(
@@ -419,6 +418,17 @@ fun RowScope.SuggestionItem(words: SuggestedWords, idx: Int, isPrimary: Boolean,
                     .testTag("SuggestionItemText")
                 if(isVerbatim) {
                     AutoFitText('"' + word + '"', style = textStyle.copy(fontStyle = FontStyle.Italic), modifier = modifier)
+                } else if (isEmoji && raisedEmojiStyle) {
+                    FluentEmoji3DImage(
+                        emoji = word,
+                        enabled = true,
+                        modifier = Modifier
+                            .align(Center)
+                            .size(emojiSize)
+                            .testTag("SuggestionItem3D")
+                    ) {
+                        AutoFitText(word, style = textStyle, modifier = modifier)
+                    }
                 } else {
                     AutoFitText(word, style = textStyle, modifier = modifier)
                 }
