@@ -86,9 +86,19 @@ private data class SerializedTomlFile(
         val action_button_background_color: String? = null,
         val action_button_foreground_color: String? = null,
         val expanded_actions_bar_color: String? = null,
+        // Theme extension V2.2: 9-slice action-button backgrounds (normal/pressed).
+        val action_button_border: String? = null,
+        val action_button_pressed_border: String? = null,
+        val expand_button_border: String? = null,
+        val expand_button_pressed_border: String? = null,
+        val mic_button_border: String? = null,
+        val mic_button_pressed_border: String? = null,
         val suggestion_font_scale: LFloat = 1.0f,
         val suggestion_text_color: String? = null,
         val suggestion_bar_color: String? = null,
+        val suggestion_bar_border: String? = null,
+        val suggestion_bar_inset_horizontal: LFloat = 2.0f,
+        val suggestion_bar_inset_vertical: LFloat = 2.0f,
         val suggestion_divider_color: String? = null,
         // Optional 9-slice PNGs; assets may reuse an existing [[asset.border]].
         val suggestion_item_border: String? = null,
@@ -442,10 +452,35 @@ private data class SerializedTomlFile(
                     actionIconColor = options.action_icon_color?.toColor(palette),
                     actionButtonBackgroundColor = options.action_button_background_color?.toColor(palette),
                     actionButtonForegroundColor = options.action_button_foreground_color?.toColor(palette),
+                    actionButtonBorder = options.action_button_border?.let { name ->
+                        decodeOptionalImage(ctx, name)?.let { decodeBorder(name, it) }
+                    },
+                    actionButtonPressedBorder = options.action_button_pressed_border?.let { name ->
+                        decodeOptionalImage(ctx, name)?.let { decodeBorder(name, it) }
+                    },
+                    expandButtonBorder = options.expand_button_border?.let { name ->
+                        decodeOptionalImage(ctx, name)?.let { decodeBorder(name, it) }
+                    },
+                    expandButtonPressedBorder = options.expand_button_pressed_border?.let { name ->
+                        decodeOptionalImage(ctx, name)?.let { decodeBorder(name, it) }
+                    },
+                    micButtonBorder = options.mic_button_border?.let { name ->
+                        decodeOptionalImage(ctx, name)?.let { decodeBorder(name, it) }
+                    },
+                    micButtonPressedBorder = options.mic_button_pressed_border?.let { name ->
+                        decodeOptionalImage(ctx, name)?.let { decodeBorder(name, it) }
+                    },
                     expandedActionsBarColor = options.expanded_actions_bar_color?.toColor(palette),
                     suggestionFontScale = options.suggestion_font_scale,
                     suggestionTextColor = options.suggestion_text_color?.toColor(palette),
                     suggestionBarColor = options.suggestion_bar_color?.toColor(palette),
+                    suggestionBarBorder = options.suggestion_bar_border?.let { name ->
+                        decodeOptionalImage(ctx, name)?.let { decodeBorder(name, it) }
+                    },
+                    suggestionBarInsetHorizontal = options.suggestion_bar_inset_horizontal
+                        .takeIf { it.isFinite() }?.coerceIn(0.0f, 16.0f) ?: 2.0f,
+                    suggestionBarInsetVertical = options.suggestion_bar_inset_vertical
+                        .takeIf { it.isFinite() }?.coerceIn(0.0f, 16.0f) ?: 2.0f,
                     suggestionDividerColor = options.suggestion_divider_color?.toColor(palette),
                     thumbnailImage = backgroundImage,
                     thumbnailScale = 1.0f,

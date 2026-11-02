@@ -221,9 +221,18 @@ data class SerializableJsonTheme(
     val actionButtonBackgroundColor: SerializableJsonColor? = null,
     val actionButtonForegroundColor: SerializableJsonColor? = null,
     val expandedActionsBarColor: SerializableJsonColor? = null,
+    val actionButtonBorder: String? = null,
+    val actionButtonPressedBorder: String? = null,
+    val expandButtonBorder: String? = null,
+    val expandButtonPressedBorder: String? = null,
+    val micButtonBorder: String? = null,
+    val micButtonPressedBorder: String? = null,
     val suggestionFontScale: Float = 1.0f,
     val suggestionTextColor: SerializableJsonColor? = null,
     val suggestionBarColor: SerializableJsonColor? = null,
+    val suggestionBarBorder: String? = null,
+    val suggestionBarInsetHorizontal: Float = 2.0f,
+    val suggestionBarInsetVertical: Float = 2.0f,
     val suggestionDividerColor: SerializableJsonColor? = null,
     // JSON border images follow the existing 1px nine-patch keyBackgrounds format.
     val suggestionItemBorder: String? = null,
@@ -340,10 +349,28 @@ data class SerializableJsonTheme(
                     actionIconColor = actionIconColor?.toColor(),
                     actionButtonBackgroundColor = actionButtonBackgroundColor?.toColor(),
                     actionButtonForegroundColor = actionButtonForegroundColor?.toColor(),
+                    actionButtonBorder = decodeOptionalImage(ctx, actionButtonBorder)
+                        ?.asAndroidBitmap()?.toNinePatchDrawable(ctx.context.resources),
+                    actionButtonPressedBorder = decodeOptionalImage(ctx, actionButtonPressedBorder)
+                        ?.asAndroidBitmap()?.toNinePatchDrawable(ctx.context.resources),
+                    expandButtonBorder = decodeOptionalImage(ctx, expandButtonBorder)
+                        ?.asAndroidBitmap()?.toNinePatchDrawable(ctx.context.resources),
+                    expandButtonPressedBorder = decodeOptionalImage(ctx, expandButtonPressedBorder)
+                        ?.asAndroidBitmap()?.toNinePatchDrawable(ctx.context.resources),
+                    micButtonBorder = decodeOptionalImage(ctx, micButtonBorder)
+                        ?.asAndroidBitmap()?.toNinePatchDrawable(ctx.context.resources),
+                    micButtonPressedBorder = decodeOptionalImage(ctx, micButtonPressedBorder)
+                        ?.asAndroidBitmap()?.toNinePatchDrawable(ctx.context.resources),
                     expandedActionsBarColor = expandedActionsBarColor?.toColor(),
                     suggestionFontScale = suggestionFontScale,
                     suggestionTextColor = suggestionTextColor?.toColor(),
                     suggestionBarColor = suggestionBarColor?.toColor(),
+                    suggestionBarBorder = decodeOptionalImage(ctx, suggestionBarBorder)
+                        ?.asAndroidBitmap()?.toNinePatchDrawable(ctx.context.resources),
+                    suggestionBarInsetHorizontal = suggestionBarInsetHorizontal
+                        .takeIf { it.isFinite() }?.coerceIn(0.0f, 16.0f) ?: 2.0f,
+                    suggestionBarInsetVertical = suggestionBarInsetVertical
+                        .takeIf { it.isFinite() }?.coerceIn(0.0f, 16.0f) ?: 2.0f,
                     suggestionDividerColor = suggestionDividerColor?.toColor(),
                     suggestionItemBorder = decodeOptionalImage(ctx, suggestionItemBorder)
                         ?.asAndroidBitmap()?.toNinePatchDrawable(ctx.context.resources),
