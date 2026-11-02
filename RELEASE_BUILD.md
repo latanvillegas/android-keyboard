@@ -42,3 +42,11 @@ fuente ni compartirlos mediante la conversación.
 Este fork mantiene **solo el workflow Release**. Se eliminó
 `.github/workflows/android-verify.yml` para evitar generar APK Debug.
 Las pruebas en un teléfono físico requieren acceso ADB al dispositivo.
+
+## Fluent Emoji 3D resource verification
+
+The Release workflow stages pre-rendered Microsoft Fluent Emoji 3D assets
+before Gradle, then checks that the APK contains at least 2,500 icons,
+`assets/emoji3d/index.txt`, and the bundled MIT license. The ZIP also
+contains `emoji-3d-verification.txt` and `FLUENT_EMOJI_LICENSE.txt`.
+The artwork is offline, original-color and does not modify theme backgrounds.

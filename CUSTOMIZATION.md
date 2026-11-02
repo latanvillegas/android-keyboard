@@ -84,3 +84,29 @@ This is a **2.5D renderer effect**, not replacement 3D emoji art assets.
 Unicode codepoints, skin tone behavior, and inserted text remain unchanged.
 
 The GitHub Actions pipeline builds **Release only**, never Debug.
+
+## Actual Microsoft Fluent 3D artwork (Release)
+
+The previous painted per-emoji rounded-rectangle and fake glyph shadows have
+been removed from the emoji grid. **Keyboard themes and theme backgrounds are
+unchanged**. The same immutable, full-color transparent Microsoft Fluent Emoji
+3D artwork is now shown in the emoji picker, search results, skin-tone
+variants and emoji-only predictions. The original Unicode or ASCII text is
+always inserted; only its preview image changes.
+
+The build packages 2,980 Microsoft Fluent Emoji 3D sprites, resized to
+128-pixel WebP with alpha and without tinting. The source archive is pinned to
+`shuding/fluentui-emoji-unicode@7a40f1a2d064d76e436813edc0f09b6c8cde5da8`,
+which reorganizes Microsoft's MIT-licensed Fluent Emoji by Unicode.
+
+The default-on switch formerly called "3D relief" now enables the **real
+prerendered 3D artwork**. Disabling it returns to system Unicode rendering
+without artificial circles. Some unsupported emojis fall back gracefully.
+ASCII/kaomoji text is optionally represented by semantically corresponding
+3D face artwork; the typed ASCII text remains unmodified. This is
+prerendered 3D artwork, not interactive 3D mesh rendering.
+
+No runtime network requests are made for emoji art. Release artifacts include
+the source provenance and the full MIT license. See
+`THIRD_PARTY_EMOJI_3D.md` and
+`scripts/build_emoji3d_assets.py`.
