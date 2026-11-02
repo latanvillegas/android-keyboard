@@ -44,4 +44,6 @@
     <string name="custom_ui_language_spanish">Español</string>
     <string name="custom_ui_language_english">Inglés</string>
     <string name="custom_ui_language_older_android_notice">En Android 12 o anterior, este ajuste se aplica solo a las pantallas de configuración.</string>
+    <string name="custom_theme_reduced_effects">Reducir efectos visuales</string>
+    <string name="custom_theme_reduced_effects_desc">Desactiva los efectos animados para ahorrar energía. Conserva los colores y las imágenes del tema.</string>
 </resources>
