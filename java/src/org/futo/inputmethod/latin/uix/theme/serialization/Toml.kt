@@ -23,6 +23,7 @@ import kotlinx.serialization.encoding.Encoder
 import org.futo.inputmethod.latin.uix.ExtraColors
 import org.futo.inputmethod.latin.uix.KeyboardColorScheme
 import org.futo.inputmethod.latin.uix.theme.AdvancedThemeOptions
+import org.futo.inputmethod.latin.uix.theme.ThemeActionIcon
 import org.futo.inputmethod.latin.uix.theme.GenericPalette
 import org.futo.inputmethod.latin.uix.theme.KeyIcon
 import org.futo.inputmethod.latin.uix.theme.ThemeDecodingContext
@@ -77,6 +78,12 @@ private data class SerializedTomlFile(
         val scale_hints: LFloat = 1.0f,
         val mic_icon: String? = null,
         val mic_icon_scale: LFloat = 1.0f,
+        // Optional V2 theme extension. Existing TOML ZIPs remain compatible.
+        val action_icons: List<ActionIconSpec> = emptyList(),
+        val action_icon_color: String? = null,
+        val action_button_background_color: String? = null,
+        val action_button_foreground_color: String? = null,
+        val expanded_actions_bar_color: String? = null,
         val suggestion_font_scale: LFloat = 1.0f,
         val suggestion_text_color: String? = null,
         val suggestion_bar_color: String? = null,
@@ -88,6 +95,14 @@ private data class SerializedTomlFile(
     ) {
         @Serializable
         data class Font(val font: String? = null)
+
+        @Serializable
+        data class ActionIconSpec(
+            val name: String,
+            val asset: String,
+            val scale: LFloat = 1.0f,
+            val tint: Boolean = false
+        )
 
         @Serializable
         data class Background(
@@ -360,6 +375,21 @@ private data class SerializedTomlFile(
                     actionBarOpacity = options.background?.action_bar_opacity ?: 0.5f,
                     actionMicIcon = decodeOptionalImage(ctx, options.mic_icon),
                     actionMicIconScale = options.mic_icon_scale,
+                    actionIcons = options.action_icons.take(64).mapNotNull { spec ->
+                        if (!spec.name.matches(Regex("[a-z][a-z0-9_]{0,79}"))) null
+                        else decodeOptionalImage(ctx, spec.asset)?.let { image ->
+                            spec.name to ThemeActionIcon(
+                                image = image,
+                                scale = spec.scale.takeIf { it.isFinite() }
+                                    ?.coerceIn(0.2f, 5.0f) ?: 1.0f,
+                                tint = spec.tint
+                            )
+                        }
+                    }.toMap(),
+                    actionIconColor = options.action_icon_color?.toColor(palette),
+                    actionButtonBackgroundColor = options.action_button_background_color?.toColor(palette),
+                    actionButtonForegroundColor = options.action_button_foreground_color?.toColor(palette),
+                    expandedActionsBarColor = options.expanded_actions_bar_color?.toColor(palette),
                     suggestionFontScale = options.suggestion_font_scale,
                     suggestionTextColor = options.suggestion_text_color?.toColor(palette),
                     suggestionBarColor = options.suggestion_bar_color?.toColor(palette),
