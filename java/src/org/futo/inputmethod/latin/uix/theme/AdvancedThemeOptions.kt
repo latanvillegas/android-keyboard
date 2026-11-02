@@ -22,6 +22,13 @@ data class KeyIcon(
     val drawable: Drawable
 )
 
+/** Per-action assets keyed by Android drawable entry name (e.g. mic_fill). */
+data class ThemeActionIcon(
+    val image: ImageBitmap,
+    val scale: Float = 1.0f,
+    val tint: Boolean = false
+)
+
 data class AdvancedThemeOptions(
     val backgroundShader: String? = null,
     val backgroundImage: ImageBitmap? = null,
@@ -35,6 +42,12 @@ data class AdvancedThemeOptions(
     val keyIcons: KeyedBitmaps<KeyIcon>? = null,
     val actionMicIcon: ImageBitmap? = null,
     val actionMicIconScale: Float = 1.0f,
+    // Optional V2 extension: V1 themes continue to use their original icons.
+    val actionIcons: Map<String, ThemeActionIcon> = emptyMap(),
+    val actionIconColor: Color? = null,
+    val actionButtonBackgroundColor: Color? = null,
+    val actionButtonForegroundColor: Color? = null,
+    val expandedActionsBarColor: Color? = null,
     val suggestionFontScale: Float = 1.0f,
     val suggestionTextColor: Color? = null,
     val suggestionBarColor: Color? = null,
