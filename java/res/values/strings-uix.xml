@@ -751,4 +751,10 @@ Default is %1$s</string>
     <string name="custom_theme_v2_close">Close</string>
     <string name="custom_theme_v2_tool_next">Next</string>
     <string name="custom_theme_v2_no_tint_note">PNG/WebP images retain their original colors.</string>
+    <string name="custom_ui_language_title">Settings interface language</string>
+    <string name="custom_ui_language_description">Changes the language of settings without changing keyboard layouts or dictionaries.</string>
+    <string name="custom_ui_language_system">System</string>
+    <string name="custom_ui_language_spanish">Spanish</string>
+    <string name="custom_ui_language_english">English</string>
+    <string name="custom_ui_language_older_android_notice">On Android 12 and earlier, this preference applies only to settings screens.</string>
 </resources>
