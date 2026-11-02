@@ -38,4 +38,10 @@
     <string name="custom_theme_v2_close">Cerrar</string>
     <string name="custom_theme_v2_tool_next">Siguiente</string>
     <string name="custom_theme_v2_no_tint_note">Las imágenes PNG/WebP conservan sus colores originales.</string>
+    <string name="custom_ui_language_title">Idioma de la interfaz de ajustes</string>
+    <string name="custom_ui_language_description">Cambia el idioma de los ajustes sin modificar los diseños del teclado ni los diccionarios.</string>
+    <string name="custom_ui_language_system">Sistema</string>
+    <string name="custom_ui_language_spanish">Español</string>
+    <string name="custom_ui_language_english">Inglés</string>
+    <string name="custom_ui_language_older_android_notice">En Android 12 o anterior, este ajuste se aplica solo a las pantallas de configuración.</string>
 </resources>
