@@ -7,6 +7,8 @@ on:
       - ".github/workflows/android-release.yml"
       - "java/**"
       - "common/**"
+      - "scripts/**"
+      - "tests/unit/**"
       - "native/**"
       - "voiceinput-shared/**"
       - "build.gradle"
@@ -46,6 +48,13 @@ jobs:
             java/assets/themes \
             java/res-large \
             voiceinput-shared/src/main/ml
+
+      - name: Audit Spanish localization and formatting placeholders
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/audit_spanish_resources.py \
+            --root . --out spanish-audit
 
       - uses: actions/setup-java@v4
         with:
@@ -179,7 +188,9 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x gradlew
-          ./gradlew --no-daemon --stacktrace --warning-mode summary assembleStableRelease
+          # JVM regression tests compile no Debug APK or instrumentation package.
+          ./gradlew --no-daemon --stacktrace --warning-mode summary \
+            testStableReleaseUnitTest assembleStableRelease
 
       - name: Verify APK signature, contents and SHA-256
         shell: bash
@@ -192,6 +203,8 @@ jobs:
           fi
           mkdir -p release-dist
           cp "$apk" release-dist/futo-keyboard-stable-release.apk
+          cp spanish-audit/report.json release-dist/spanish-audit.json
+          cp spanish-audit/report.md release-dist/spanish-audit.md
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs \
             release-dist/futo-keyboard-stable-release.apk | tee release-dist/apk-signature.txt
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging \
