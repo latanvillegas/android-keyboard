@@ -4,6 +4,9 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.view.ContextThemeWrapper
 import com.google.android.material.color.utilities.Hct
 import androidx.compose.foundation.Canvas
@@ -15,6 +18,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -36,6 +43,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -52,6 +60,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
@@ -99,6 +108,51 @@ import org.futo.inputmethod.latin.uix.theme.presets.DefaultDarkScheme
 import org.futo.inputmethod.v2keyboard.LayoutManager
 import java.io.ByteArrayOutputStream
 import kotlin.math.roundToInt
+
+/**
+ * Read and normalize a user-selected icon without decoding unbounded data.
+ * Theme assets are always 256px RGBA PNG at most 2 MiB.
+ */
+private fun importActionIconImage(context: Context, uri: Uri): ByteArray? = try {
+    val raw = context.contentResolver.openInputStream(uri)?.use { input ->
+        val out = ByteArrayOutputStream()
+        val chunk = ByteArray(8192)
+        while (true) {
+            val n = input.read(chunk)
+            if (n < 0) break
+            if (out.size() + n > 2 * 1024 * 1024) return null
+            out.write(chunk, 0, n)
+        }
+        out.toByteArray()
+    } ?: return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(raw, 0, raw.size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0 ||
+        bounds.outWidth > 4096 || bounds.outHeight > 4096) return null
+
+    val sample = generateSequence(1) { if (it < 16) it * 2 else null }
+        .takeWhile {
+            bounds.outWidth / it > 512 || bounds.outHeight / it > 512
+        }.lastOrNull() ?: 1
+    val image = BitmapFactory.decodeByteArray(
+        raw, 0, raw.size,
+        BitmapFactory.Options().apply { inSampleSize = sample }
+    ) ?: return null
+    val scale = minOf(1f, 256f / maxOf(image.width, image.height))
+    val scaled = if (scale < 1f) {
+        Bitmap.createScaledBitmap(
+            image, (image.width * scale).toInt().coerceAtLeast(1),
+            (image.height * scale).toInt().coerceAtLeast(1), true
+        )
+    } else image
+    val result = ByteArrayOutputStream()
+    scaled.compress(Bitmap.CompressFormat.PNG, 100, result)
+    if (scaled !== image) scaled.recycle()
+    image.recycle()
+    result.toByteArray().takeIf { it.isNotEmpty() && it.size <= 2 * 1024 * 1024 }
+} catch (_: Exception) {
+    null
+}
 
 private data class Tool(
     val name: Int,
