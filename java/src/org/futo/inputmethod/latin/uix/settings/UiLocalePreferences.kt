@@ -59,8 +59,9 @@ object UiLocalePreferences {
     fun findActivity(context: Context): Activity? {
         var current: Context? = context
         repeat(12) {
-            if (current is Activity) return current
-            current = (current as? ContextWrapper)?.baseContext ?: return null
+            val candidate = current
+            if (candidate is Activity) return candidate
+            current = (candidate as? ContextWrapper)?.baseContext ?: return null
         }
         return null
     }
