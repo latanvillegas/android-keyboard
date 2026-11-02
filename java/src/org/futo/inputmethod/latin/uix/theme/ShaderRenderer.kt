@@ -3,6 +3,9 @@ package org.futo.inputmethod.latin.uix.theme
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.layout.Box
+import org.futo.inputmethod.latin.uix.ReduceVisualEffectsSetting
+import org.futo.inputmethod.latin.uix.settings.useDataStoreValue
 import android.opengl.EGL14
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
@@ -309,6 +312,11 @@ class ShaderSurfaceView(context: Context, shaderSource: String, iChannels: List<
 
 @Composable
 fun KeyboardSurfaceShaderBackground(shaderSource: String, iChannels: List<Bitmap> = listOf(), modifier: Modifier = Modifier) {
+    if (useDataStoreValue(ReduceVisualEffectsSetting)) {
+        // No 60 FPS shader loop; the regular theme background stays visible.
+        Box(modifier)
+        return
+    }
     val view: MutableState<GLSurfaceView?> = remember { mutableStateOf<GLSurfaceView?>(null) }
     LaunchedEffect(view.value) {
         while (true) {
