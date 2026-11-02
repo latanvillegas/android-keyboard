@@ -136,6 +136,7 @@ import org.futo.inputmethod.latin.uix.settings.useDataStore
 import org.futo.inputmethod.latin.uix.settings.useDataStoreValue
 import org.futo.inputmethod.latin.uix.theme.LocalCompatEmojiFamily
 import org.futo.inputmethod.latin.uix.theme.LocalCompatEmojiTypeface
+import org.futo.inputmethod.latin.uix.theme.KeyBackground
 import org.futo.inputmethod.latin.uix.theme.ThemeOption
 import org.futo.inputmethod.latin.uix.theme.Typography
 import org.futo.inputmethod.latin.uix.theme.UixThemeWrapper
@@ -544,7 +545,7 @@ fun RowScope.SuggestionItem(words: SuggestedWords, idx: Int, isPrimary: Boolean,
         advanced.suggestionItemPressedBorder != null ||
         advanced.suggestionItemBackgroundColor != null ||
         advanced.suggestionItemPressedBackgroundColor != null
-    if (hasItemDecoration && advanced.suggestionItemHideDividers) return
+    if (advanced.suggestionBarBorder != null || (hasItemDecoration && advanced.suggestionItemHideDividers)) return
 
     Box(
         modifier = Modifier
@@ -651,69 +652,161 @@ fun makeSuggestionLayout(words: SuggestedWords, blacklist: SuggestionBlacklist?,
     )
 }
 
-@Composable
-fun RowScope.SuggestionItems(words: SuggestedWords, onClick: (i: Int) -> Unit, onLongClick: (i: Int) -> Unit) {
-    val layout = makeSuggestionLayout(
-        words = words,
-        blacklist = null,
-        swipeTailRemovePrimarySuggestion = useDataStoreValue(DisplayTop4Setting)
-    )
 
-    val suggestionItem = @Composable { suggestion: SuggestedWordInfo? ->
-        if(suggestion != null) {
-            val idx = words.indexOf(suggestion)
-            SuggestionItem(
-                words,
-                idx,
-                isPrimary = idx == SuggestedWords.INDEX_OF_AUTO_CORRECTION,
-                forcePrimary = suggestion == layout.swipePrimaryElement,
-                onClick = { onClick(idx) },
-                onLongClick = { onLongClick(idx) },
-                isEmoji = suggestion in layout.emojiMatches
-            )
-        } else {
-            Spacer(Modifier.weight(1.0f))
-        }
+/**
+ * Render a theme 9-slice behind a full-width suggestion strip or circular
+ * action button. Each composable owns its Drawable instance and does not
+ * mutate cached theme objects shared with other buttons.
+ *
+ * Visual insets only affect drawing, never the clickable hitbox.
+ */
+@Composable
+private fun Modifier.themeNineSliceBackground(
+    normal: KeyBackground?,
+    pressedBorder: KeyBackground? = null,
+    isPressed: Boolean = false,
+    fallback: Color? = null,
+    circular: Boolean = false,
+    insetHorizontal: Dp = 0.dp,
+    insetVertical: Dp = 0.dp,
+    radius: Dp = 12.dp
+): Modifier {
+    val normalDrawable = remember(normal?.background) {
+        normal?.background?.let { it.constantState?.newDrawable()?.mutate() ?: it }
+    }
+    val pressedDrawable = remember(pressedBorder?.background) {
+        pressedBorder?.background?.let { it.constantState?.newDrawable()?.mutate() ?: it }
     }
 
-    when {
-        layout.isGestureBatch ||
-                (layout.emojiMatches.isEmpty() && layout.presentableSuggestions.size <= 1) ->
-            suggestionItem(layout.presentableSuggestions.firstOrNull())
+    return drawBehind {
+        val insetX = insetHorizontal.toPx().coerceIn(0.0f, size.width / 2.0f)
+        val insetY = insetVertical.toPx().coerceIn(0.0f, size.height / 2.0f)
+        val availableW = (size.width - insetX * 2.0f).coerceAtLeast(0.0f)
+        val availableH = (size.height - insetY * 2.0f).coerceAtLeast(0.0f)
+        if (availableW <= 0.0f || availableH <= 0.0f) return@drawBehind
 
-        layout.autocorrectMatch != null -> {
-            var supplementalSuggestionIndex = 0
-            if(layout.emojiMatches.isEmpty()) {
-                suggestionItem(layout.sortedMatches.getOrNull(supplementalSuggestionIndex++))
-            } else {
-                suggestionItem(layout.emojiMatches[0])
-            }
-            SuggestionSeparator()
-            suggestionItem(layout.autocorrectMatch)
-            SuggestionSeparator()
+        val side = minOf(availableW, availableH)
+        val left = if (circular) (size.width - side) / 2.0f else insetX
+        val top = if (circular) (size.height - side) / 2.0f else insetY
+        val width = if (circular) side else availableW
+        val height = if (circular) side else availableH
 
-            if(layout.verbatimWord != null && layout.verbatimWord.mWord != layout.autocorrectMatch.mWord) {
-                suggestionItem(layout.verbatimWord)
+        fallback?.let { color ->
+            if (circular) {
+                drawCircle(
+                    color = color,
+                    radius = side / 2.0f,
+                    center = Offset(size.width / 2.0f, size.height / 2.0f)
+                )
             } else {
-                suggestionItem(layout.sortedMatches.getOrNull(supplementalSuggestionIndex))
+                val r = radius.toPx().coerceAtMost(minOf(width, height) / 2.0f)
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(left, top),
+                    size = Size(width, height),
+                    cornerRadius = CornerRadius(r, r)
+                )
             }
         }
 
-        else -> {
-            var supplementalSuggestionIndex = 1
-            if(layout.emojiMatches.isEmpty()) {
-                suggestionItem(layout.sortedMatches.getOrNull(supplementalSuggestionIndex++))
-            } else {
-                suggestionItem(layout.emojiMatches[0])
+        val drawable = if (isPressed) pressedDrawable ?: normalDrawable else normalDrawable
+        if (drawable != null) {
+            drawIntoCanvas { canvas ->
+                val native = canvas.nativeCanvas
+                val saved = native.save()
+                try {
+                    drawable.setBounds(
+                        left.toInt(), top.toInt(),
+                        (left + width).toInt(), (top + height).toInt()
+                    )
+                    drawable.draw(native)
+                } finally {
+                    native.restoreToCount(saved)
+                }
             }
-            SuggestionSeparator()
-            suggestionItem(layout.sortedMatches.getOrNull(0))
-            SuggestionSeparator()
-            suggestionItem(layout.sortedMatches.getOrNull(supplementalSuggestionIndex))
         }
     }
 }
 
+@Composable
+fun RowScope.SuggestionItems(words: SuggestedWords, onClick: (i: Int) -> Unit, onLongClick: (i: Int) -> Unit) {
+    val advanced = LocalKeyboardScheme.current.extended.advancedThemeOptions
+    // The row is a single visual surface, yet each suggestion retains its
+    // independent tap and long-press target. The nine-slice stretches to
+    // the actual available width in both portrait and landscape modes.
+    Box(
+        modifier = Modifier
+            .weight(1.0f)
+            .fillMaxHeight()
+            .themeNineSliceBackground(
+                normal = advanced.suggestionBarBorder,
+                insetHorizontal = advanced.suggestionBarInsetHorizontal.dp,
+                insetVertical = advanced.suggestionBarInsetVertical.dp
+            )
+    ) {
+        Row(Modifier.fillMaxSize()) {
+            val layout = makeSuggestionLayout(
+                words = words,
+                blacklist = null,
+                swipeTailRemovePrimarySuggestion = useDataStoreValue(DisplayTop4Setting)
+            )
+        
+            val suggestionItem = @Composable { suggestion: SuggestedWordInfo? ->
+                if(suggestion != null) {
+                    val idx = words.indexOf(suggestion)
+                    SuggestionItem(
+                        words,
+                        idx,
+                        isPrimary = idx == SuggestedWords.INDEX_OF_AUTO_CORRECTION,
+                        forcePrimary = suggestion == layout.swipePrimaryElement,
+                        onClick = { onClick(idx) },
+                        onLongClick = { onLongClick(idx) },
+                        isEmoji = suggestion in layout.emojiMatches
+                    )
+                } else {
+                    Spacer(Modifier.weight(1.0f))
+                }
+            }
+        
+            when {
+                layout.isGestureBatch ||
+                        (layout.emojiMatches.isEmpty() && layout.presentableSuggestions.size <= 1) ->
+                    suggestionItem(layout.presentableSuggestions.firstOrNull())
+        
+                layout.autocorrectMatch != null -> {
+                    var supplementalSuggestionIndex = 0
+                    if(layout.emojiMatches.isEmpty()) {
+                        suggestionItem(layout.sortedMatches.getOrNull(supplementalSuggestionIndex++))
+                    } else {
+                        suggestionItem(layout.emojiMatches[0])
+                    }
+                    SuggestionSeparator()
+                    suggestionItem(layout.autocorrectMatch)
+                    SuggestionSeparator()
+        
+                    if(layout.verbatimWord != null && layout.verbatimWord.mWord != layout.autocorrectMatch.mWord) {
+                        suggestionItem(layout.verbatimWord)
+                    } else {
+                        suggestionItem(layout.sortedMatches.getOrNull(supplementalSuggestionIndex))
+                    }
+                }
+        
+                else -> {
+                    var supplementalSuggestionIndex = 1
+                    if(layout.emojiMatches.isEmpty()) {
+                        suggestionItem(layout.sortedMatches.getOrNull(supplementalSuggestionIndex++))
+                    } else {
+                        suggestionItem(layout.emojiMatches[0])
+                    }
+                    SuggestionSeparator()
+                    suggestionItem(layout.sortedMatches.getOrNull(0))
+                    SuggestionSeparator()
+                    suggestionItem(layout.sortedMatches.getOrNull(supplementalSuggestionIndex))
+                }
+            }
+        }
+    }
+}
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LazyItemScope.ActionItem(idx: Int, action: Action, onSelect: (Action) -> Unit, onLongSelect: (Action) -> Unit) {
@@ -743,28 +836,35 @@ fun ActionItemSmall(action: Action, onSelect: (Action) -> Unit, onLongSelect: (A
         ?: LocalKeyboardScheme.current.keyboardContainer
     val fgCol = advanced.actionButtonForegroundColor
         ?: LocalKeyboardScheme.current.onKeyboardContainer
+    val isMic = action.icon == R.drawable.mic_fill
+    val normal = (if (isMic) advanced.micButtonBorder else null) ?: advanced.actionButtonBorder
+    val pressed = (if (isMic) advanced.micButtonPressedBorder else null) ?: advanced.actionButtonPressedBorder
+    val themed = normal != null || pressed != null
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
     val width = maxOf(42.dp, themedActionIconSize(action, 16.dp) + 8.dp)
-    val circleRadius = with(LocalDensity.current) {
-        maxOf(16.dp, width / 2f - 4.dp).toPx()
-    }
 
-    Box(modifier = Modifier
-        .width(width)
-        .fillMaxHeight()
-        .drawBehind {
-            drawCircle(
-                color = bgCol,
-                radius = circleRadius,
-                style = Fill
+    Box(
+        modifier = Modifier
+            .width(width)
+            .fillMaxHeight()
+            .themeNineSliceBackground(
+                normal = normal,
+                pressedBorder = pressed,
+                isPressed = isPressed,
+                fallback = bgCol,
+                circular = true,
+                insetHorizontal = 4.dp,
+                insetVertical = 4.dp
             )
-        }
-        .clip(CircleShape)
-        .combinedClickable(onLongClick = action.altPressImpl?.let { { onLongSelect(action) } }) {
-            onSelect(
-                action
-            )
-        },
+            .then(if (themed) Modifier else Modifier.clip(CircleShape))
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = if (themed) null else LocalIndication.current,
+                onLongClick = action.altPressImpl?.let { { onLongSelect(action) } },
+                onClick = { onSelect(action) }
+            ),
         contentAlignment = Center
     ) {
         ThemedActionIcon(action, 16.dp, fgCol)
@@ -876,12 +976,12 @@ fun ExpandActionsButton(isActionsOpen: Boolean, onClick: () -> Unit) {
         ?: LocalKeyboardScheme.current.keyboardContainer
     val fgCol = advanced.actionButtonForegroundColor
         ?: LocalKeyboardScheme.current.onKeyboardContainer
+    val normal = advanced.expandButtonBorder ?: advanced.actionButtonBorder
+    val pressed = advanced.expandButtonPressedBorder ?: advanced.actionButtonPressedBorder
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
     val iconSize = themedActionIconSize(R.drawable.chevron_right, 20.dp)
     val buttonWidth = maxOf(42.dp, iconSize + 8.dp)
-
-    val circleRadius = with(LocalDensity.current) {
-        maxOf(16.dp, buttonWidth / 2f - 4.dp).toPx()
-    }
 
     IconButton(
         onClick = onClick,
@@ -889,13 +989,16 @@ fun ExpandActionsButton(isActionsOpen: Boolean, onClick: () -> Unit) {
             .width(buttonWidth)
             .rotate(if (isActionsOpen) -90.0f else 0.0f)
             .fillMaxHeight()
-            .drawBehind {
-                drawCircle(
-                    color = bgCol,
-                    radius = circleRadius,
-                    style = Fill
-                )
-            },
+            .themeNineSliceBackground(
+                normal = normal,
+                pressedBorder = pressed,
+                isPressed = isPressed,
+                fallback = bgCol,
+                circular = true,
+                insetHorizontal = 4.dp,
+                insetVertical = 4.dp
+            ),
+        interactionSource = interactionSource,
         colors = IconButtonDefaults.iconButtonColors(contentColor = fgCol)
     ) {
         ThemedActionIcon(
