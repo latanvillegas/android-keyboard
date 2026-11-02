@@ -113,7 +113,8 @@ import kotlin.math.roundToInt
  * Read and normalize a user-selected icon without decoding unbounded data.
  * Theme assets are always 256px RGBA PNG at most 2 MiB.
  */
-private fun importActionIconImage(context: Context, uri: Uri): ByteArray? = try {
+private fun importActionIconImage(context: Context, uri: Uri): ByteArray? {
+    return try {
     val raw = context.contentResolver.openInputStream(uri)?.use { input ->
         val out = ByteArrayOutputStream()
         val chunk = ByteArray(8192)
@@ -151,7 +152,8 @@ private fun importActionIconImage(context: Context, uri: Uri): ByteArray? = try 
     image.recycle()
     result.toByteArray().takeIf { it.isNotEmpty() && it.size <= 2 * 1024 * 1024 }
 } catch (_: Exception) {
-    null
+        null
+    }
 }
 
 private data class Tool(
@@ -264,6 +266,35 @@ internal fun ThemeEditor(
     var suggestionFontScale by remember { mutableFloatStateOf(1.0f) }
     var suggestionTextColor by remember { mutableStateOf<Color?>(null) }
     var suggestionBarColor by remember { mutableStateOf<Color?>(null) }
+    var actionIconColor by remember { mutableStateOf<Color?>(null) }
+    var actionButtonBackgroundColor by remember { mutableStateOf<Color?>(null) }
+    var actionButtonForegroundColor by remember { mutableStateOf<Color?>(null) }
+    var expandedActionsBarColor by remember { mutableStateOf<Color?>(null) }
+    var actionIconHct by remember { mutableStateOf(Hct2(startingColor.hue, 7f, 90f)) }
+    var actionButtonHct by remember { mutableStateOf(Hct2(startingColor.hue, 38f, 28f)) }
+    var actionButtonForegroundHct by remember { mutableStateOf(Hct2(startingColor.hue, 7f, 94f)) }
+    var expandedBarHct by remember { mutableStateOf(Hct2(startingColor.hue, 23f, 15f)) }
+    val actionIconPngs = remember { mutableStateMapOf<String, ByteArray>() }
+    val actionIconScales = remember { mutableStateMapOf<String, Float>() }
+    var selectedActionIcon by remember { mutableStateOf("mic_fill") }
+    var iconPickerTarget by remember { mutableStateOf("mic_fill") }
+    var iconImportFailed by remember { mutableStateOf(false) }
+    var previewActionsExpanded by remember { mutableStateOf(false) }
+
+    val pickActionIcon = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            val icon = importActionIconImage(context, uri)
+            if (icon == null) {
+                iconImportFailed = true
+            } else {
+                iconImportFailed = false
+                actionIconPngs[iconPickerTarget] = icon
+            }
+        }
+    }
+    val actionIconFiles = actionIconPngs.keys.associateWith { "action-icons/$it.png" }
     var suggestionTextHct by remember { mutableStateOf(Hct2(startingColor.hue, 5f, 92f)) }
     var suggestionBarHct by remember { mutableStateOf(Hct2(startingColor.hue, 30f, 15f)) }
 
@@ -319,6 +350,8 @@ internal fun ThemeEditor(
     val themeCfg by rememberDelayedRecomputed(
         color, opacity, darkMode, borders,
         suggestionFontScale, suggestionTextColor, suggestionBarColor,
+        actionIconColor, actionButtonBackgroundColor, actionButtonForegroundColor,
+        expandedActionsBarColor, actionIconFiles, actionIconScales.toMap(),
         delay = computeDelay
     ) {
         CustomThemeBuilderConfiguration(
@@ -332,7 +365,13 @@ internal fun ThemeEditor(
             backgroundImageOpacity = opacity,
             suggestionFontScale = suggestionFontScale,
             suggestionTextColor = suggestionTextColor,
-            suggestionBarColor = suggestionBarColor
+            suggestionBarColor = suggestionBarColor,
+            actionIconColor = actionIconColor,
+            actionButtonBackgroundColor = actionButtonBackgroundColor,
+            actionButtonForegroundColor = actionButtonForegroundColor,
+            expandedActionsBarColor = expandedActionsBarColor,
+            actionIcons = actionIconFiles,
+            actionIconScales = actionIconScales.toMap()
         )
     }
 
