@@ -47,11 +47,22 @@ data class AdvancedThemeOptions(
     val actionIconColor: Color? = null,
     val actionButtonBackgroundColor: Color? = null,
     val actionButtonForegroundColor: Color? = null,
+    // Optional 9-slice skins for the two circular action controls.
+    val actionButtonBorder: KeyBackground? = null,
+    val actionButtonPressedBorder: KeyBackground? = null,
+    val expandButtonBorder: KeyBackground? = null,
+    val expandButtonPressedBorder: KeyBackground? = null,
+    val micButtonBorder: KeyBackground? = null,
+    val micButtonPressedBorder: KeyBackground? = null,
     val expandedActionsBarColor: Color? = null,
     val suggestionFontScale: Float = 1.0f,
     val suggestionTextColor: Color? = null,
     val suggestionBarColor: Color? = null,
     val suggestionDividerColor: Color? = null,
+    // Unified suggestion-strip 9-slice, responsive to portrait and landscape.
+    val suggestionBarBorder: KeyBackground? = null,
+    val suggestionBarInsetHorizontal: Float = 2.0f,
+    val suggestionBarInsetVertical: Float = 2.0f,
     // Optional per-suggestion backgrounds. Each 9-slice drawable is decoded once per theme.
     val suggestionItemBorder: KeyBackground? = null,
     val suggestionItemPressedBorder: KeyBackground? = null,
