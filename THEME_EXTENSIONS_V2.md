@@ -167,3 +167,52 @@ the existing JSON `keyBackgrounds`.
 The V2.1 options only affect visual presentation of suggestions. The
 suggestions are still selected and predicted by the normal keyboard engine.
 
+## Unified suggestion glass and action-button skins (V2.2, optional)
+
+The continuous suggestion strip is rendered as one 9-slice surface behind all
+candidate words. Its width follows the actual keyboard layout in both portrait
+and landscape. Each suggestion retains its own hitbox, long-press action and
+prediction semantics. When enabled, individual candidate separators are hidden.
+The image no longer needs to be baked into the keyboard wallpaper.
+
+Add these optional fields within the existing `[options]` table:
+
+```toml
+[options]
+suggestion_bar_border = "suggestions/aurora_unified_glass.png"
+suggestion_bar_inset_horizontal = 2.0
+suggestion_bar_inset_vertical = 2.0
+
+# Fallback skin for the small round action buttons.
+action_button_border = "buttons/aurora_orb.png"
+action_button_pressed_border = "buttons/aurora_orb_pressed.png"
+
+# Optional overrides for the left expander and microphone.
+expand_button_border = "buttons/aurora_orb_expand.png"
+expand_button_pressed_border = "buttons/aurora_orb_expand_pressed.png"
+mic_button_border = "buttons/aurora_orb_mic.png"
+mic_button_pressed_border = "buttons/aurora_orb_mic_pressed.png"
+```
+
+All eight image settings are optional; where omitted, the existing round
+background color is rendered. `expand_button_*` and `mic_button_*` override
+the generic `action_button_*` skins when provided. Images use the same
+`[[asset.border]]` metadata (`slicing`, `padding`, `target_density`) as
+keycaps; the action buttons retain circular bounds and full touch targets.
+The two states reflect real pointer press events, not the action-bar expansion
+state. Icon replacements and tint settings continue to work independently.
+
+In the JSON format, the corresponding optional keys are:
+`suggestionBarBorder`, `suggestionBarInsetHorizontal`,
+`suggestionBarInsetVertical`, `actionButtonBorder`,
+`actionButtonPressedBorder`, `expandButtonBorder`,
+`expandButtonPressedBorder`, `micButtonBorder` and
+`micButtonPressedBorder`. JSON PNGs use their existing Android nine-patch
+1-pixel marker convention. All TOML border assets use regular images and
+their `[[asset.border]]` metadata.
+
+The `SettingsActivity` already observes `THEME_KEY` and applies
+`UixThemeAuto`, so no additional global settings-theme override is needed.
+This extension only changes keyboard chrome; existing settings colors and
+theme previews continue to follow the selected theme.
+
