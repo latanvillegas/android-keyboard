@@ -39,6 +39,12 @@ data class CustomThemeBuilderConfiguration(
     val suggestionFontScale: Float = 1.0f,
     val suggestionTextColor: Color? = null,
     val suggestionBarColor: Color? = null,
+    val actionIconColor: Color? = null,
+    val actionButtonBackgroundColor: Color? = null,
+    val actionButtonForegroundColor: Color? = null,
+    val expandedActionsBarColor: Color? = null,
+    val actionIcons: Map<String, String> = emptyMap(),
+    val actionIconScales: Map<String, Float> = emptyMap(),
 ) {
     private val variant = Variant.VIBRANT
     private val col: Hct = Hct.from(hue, chroma, tone)
@@ -121,7 +127,13 @@ data class CustomThemeBuilderConfiguration(
         return initBasicSerializableThemeFromKeyboardScheme(colorScheme).copy(
             suggestionFontScale = suggestionFontScale,
             suggestionTextColor = suggestionTextColor?.toSColor(),
-            suggestionBarColor = suggestionBarColor?.toSColor()
+            suggestionBarColor = suggestionBarColor?.toSColor(),
+            actionIconColor = actionIconColor?.toSColor(),
+            actionButtonBackgroundColor = actionButtonBackgroundColor?.toSColor(),
+            actionButtonForegroundColor = actionButtonForegroundColor?.toSColor(),
+            expandedActionsBarColor = expandedActionsBarColor?.toSColor(),
+            actionIcons = actionIcons,
+            actionIconScales = actionIconScales
         ).let {
             if(backgroundImagePath != null) {
                 val alpha = (1.0f - backgroundImageOpacity.pow(2)) * 0.32f + 0.5f
