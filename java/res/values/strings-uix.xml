@@ -757,4 +757,6 @@ Default is %1$s</string>
     <string name="custom_ui_language_spanish">Spanish</string>
     <string name="custom_ui_language_english">English</string>
     <string name="custom_ui_language_older_android_notice">On Android 12 and earlier, this preference applies only to settings screens.</string>
+    <string name="custom_theme_reduced_effects">Reduce visual effects</string>
+    <string name="custom_theme_reduced_effects_desc">Disable animated theme shaders to save energy. Static colors and key images are preserved.</string>
 </resources>
