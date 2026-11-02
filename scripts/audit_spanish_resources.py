@@ -16,6 +16,19 @@ from pathlib import Path
 
 PLACEHOLDER = re.compile(r"%(?!%)(?:[1-9][0-9]*\$)?[-+# 0,(]*[0-9]*(?:\.[0-9]+)?[a-zA-Z]")
 
+# Configuration data and layout identifiers must retain their original bytes.
+# These are not displayed as user-facing text and translating them could
+# change which keyboard layout or locale Android selects.
+NON_UI_RESOURCE_IDS = frozenset({
+    "locale_and_extra_value_to_keyboard_layout_set_map",
+    "predefined_layout_display_names",
+    "predefined_layouts",
+    "subtype_locale_displayed_in_root_locale",
+    "subtype_locale_exception_keys",
+    "voice_mode_main",
+})
+
+
 
 def read_strings(paths: list[Path], strict: bool = False) -> dict[str, tuple[str, str]]:
     result: dict[str, tuple[str, str]] = {}
@@ -46,10 +59,20 @@ def main() -> None:
     cli = argparse.ArgumentParser()
     cli.add_argument("--root", type=Path, default=Path("."))
     cli.add_argument("--out", type=Path, default=Path("spanish-audit"))
+    cli.add_argument(
+        "--strict-ui", action="store_true",
+        help="Fail the Release when any visible Spanish text or format argument is missing",
+    )
     args = cli.parse_args()
     root = args.root
 
-    base = read_strings(list((root / "java/res/values").glob("*.xml")), strict=True)
+    all_base = read_strings(
+        list((root / "java/res/values").glob("*.xml")), strict=True
+    )
+    base = {
+        key: value for key, value in all_base.items()
+        if key not in NON_UI_RESOURCE_IDS
+    }
     # Covers the public core/core-ign translation trees and fork-local overrides.
     candidates = (
         list((root / "translations").rglob("*.xml"))
@@ -77,6 +100,9 @@ def main() -> None:
     high_priority = [k for k in missing if k.startswith(settings_prefix)]
     report = {
         "source_strings": len(base),
+        "internal_identifiers_excluded": sorted(
+            set(all_base) & NON_UI_RESOURCE_IDS
+        ),
         "translated_strings": len(set(base) & set(available)),
         "coverage_percent": round(
             100 * len(set(base) & set(available)) / max(1, len(base)), 2
@@ -100,6 +126,8 @@ def main() -> None:
         "",
         f"Cadenas originales: {len(base)}",
         f"Traducciones disponibles: {report['translated_strings']}",
+        f"Identificadores internos excluidos: "
+        f"{len(report['internal_identifiers_excluded'])}",
         f"Cobertura: {report['coverage_percent']}%",
         f"Pendientes: {len(missing)}",
         f"Marcadores de formato a revisar: {len(mismatches)}",
@@ -108,7 +136,7 @@ def main() -> None:
         "",
     ]
     heading.extend(
-        f"- \`{name}\`: {base[name][0]}" for name in high_priority[:200]
+        f"- `{name}`: {base[name][0]}" for name in high_priority[:200]
     )
     (args.out / "report.md").write_text(
         "\n".join(heading) + "\n", encoding="utf-8"
@@ -118,6 +146,12 @@ def main() -> None:
         f"({report['translated_strings']}/{len(base)}), "
         f"missing={len(missing)}, placeholders={len(mismatches)}"
     )
+    if args.strict_ui and (missing or mismatches):
+        print(
+            "ERROR: Release blocked by incomplete Spanish UI localization",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     if not (root / "translations").exists():
         print("WARNING: translations submodule is not checked out", file=sys.stderr)
 
