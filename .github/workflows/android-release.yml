@@ -69,6 +69,55 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Real prerendered 3D artwork, not UI-generated shadows/cards. Pinned
+      # to an immutable upstream commit; only the Release APK packages it.
+      - uses: actions/cache@v4
+        id: fluent3d-cache
+        with:
+          path: java/assets/emoji3d
+          key: fluent3d-128px-webp88-v1-7a40f1a2d064d76e436813edc0f09b6c8cde5da8
+
+      - uses: actions/setup-python@v5
+        if: steps.fluent3d-cache.outputs.cache-hit != 'true'
+        with:
+          python-version: '3.11'
+
+      - name: Download and package licensed Fluent Emoji 3D
+        if: steps.fluent3d-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLUENT_COMMIT=7a40f1a2d064d76e436813edc0f09b6c8cde5da8
+          FLUENT_DIR="$RUNNER_TEMP/fluentui-emoji-unicode"
+          mkdir -p "$FLUENT_DIR"
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 900 \
+            "https://codeload.github.com/shuding/fluentui-emoji-unicode/tar.gz/$FLUENT_COMMIT" \
+            -o "$RUNNER_TEMP/fluentui-emoji-3d.tar.gz"
+          tar xzf "$RUNNER_TEMP/fluentui-emoji-3d.tar.gz" \
+            -C "$FLUENT_DIR" --strip-components=1
+          python -m pip install --disable-pip-version-check Pillow==11.3.0
+          python scripts/build_emoji3d_assets.py \
+            --source "$FLUENT_DIR/assets" \
+            --dest java/assets/emoji3d \
+            --commit "$FLUENT_COMMIT"
+          rm -f "$RUNNER_TEMP/fluentui-emoji-3d.tar.gz"
+          rm -rf "$FLUENT_DIR"
+
+      - name: Verify packaged 3D assets and MIT license
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s java/assets/emoji3d/LICENSE.txt
+          test -s java/assets/emoji3d/SOURCE.json
+          count="$(wc -l < java/assets/emoji3d/index.txt)"
+          if (( count < 2500 )); then
+            echo "::error::Only $count 3D assets staged, expected at least 2500."
+            exit 1
+          fi
+          test -s java/assets/emoji3d/1f600.webp
+          test -s java/assets/emoji3d/1f44d-1f3fb.webp
+          echo "3D Fluent emoji assets staged: $count"
+
       - name: Configure production signing if secrets exist
         id: signing
         shell: bash
@@ -150,6 +199,16 @@ jobs:
             | tee release-dist/apk-manifest.txt
           unzip -t release-dist/futo-keyboard-stable-release.apk \
             | tail -n 1 | tee release-dist/zip-integrity.txt
+          asset_count="$(unzip -p release-dist/futo-keyboard-stable-release.apk \
+            assets/emoji3d/index.txt | wc -l)"
+          if (( asset_count < 2500 )); then
+            echo "::error::Release APK does not contain the complete Fluent 3D asset pack."
+            exit 1
+          fi
+          printf 'Fluent 3D artwork entries in APK: %s\\n' "$asset_count" \
+            | tee release-dist/emoji-3d-verification.txt
+          unzip -p release-dist/futo-keyboard-stable-release.apk \
+            assets/emoji3d/LICENSE.txt > release-dist/FLUENT_EMOJI_LICENSE.txt
           (cd release-dist && sha256sum futo-keyboard-stable-release.apk) \
             | tee release-dist/SHA256SUMS
           printf '%s\n' \
@@ -157,6 +216,9 @@ jobs:
             "workflow_run=$GITHUB_RUN_ID" \
             "variant=stableRelease" \
             "signing=$SIGNING_KIND" \
+            "emoji3d=Microsoft Fluent Emoji prerendered 3D" \
+            "emoji3d_source=shuding/fluentui-emoji-unicode@7a40f1a2d064d76e436813edc0f09b6c8cde5da8" \
+            "emoji3d_count=$asset_count" \
             > release-dist/BUILD-INFO.txt
 
       - name: Publish Stable Release artifact
