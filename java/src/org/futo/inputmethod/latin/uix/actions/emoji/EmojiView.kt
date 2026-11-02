@@ -21,8 +21,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
-import android.graphics.Shader
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
@@ -65,54 +63,18 @@ class EmojiView @JvmOverloads constructor(
     private var raisedStyle: Boolean = true
     private var textScale: Float = 1.0f
 
-    /** Raised 2.5D surface, with original Unicode emoji font retained. */
+    private var threeDBitmap: Bitmap? = null
+    private var renderingToken = 0L
+
+    /** Enables actual pre-rendered 3D artwork. No per-emoji background is drawn. */
     fun setRaisedStyle(enabled: Boolean) {
+        if (raisedStyle == enabled) return
         raisedStyle = enabled
+        threeDBitmap = null
+        renderingToken++
+        invalidate()
     }
 
-    private val reliefPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-
-    private fun Canvas.drawRaisedEmojiSurface() {
-        val w = width.toFloat()
-        val h = height.toFloat()
-        if (w <= 0f || h <= 0f) return
-        val inset = minOf(w, h) * 0.11f
-        val drop = minOf(w, h) * 0.06f
-        val radius = minOf(w, h) * 0.33f
-        val left = inset
-        val top = inset
-        val right = w - inset
-        val bottom = h - inset - drop
-
-        reliefPaint.shader = null
-        reliefPaint.style = Paint.Style.FILL
-        reliefPaint.color = Color.argb(95, 0, 0, 0)
-        drawRoundRect(
-            left + drop * 0.4f, top + drop, right + drop * 0.4f,
-            bottom + drop, radius, radius, reliefPaint
-        )
-        reliefPaint.shader = LinearGradient(
-            0f, top, 0f, bottom,
-            intArrayOf(
-                Color.argb(165, 255, 255, 255),
-                Color.argb(75, 255, 255, 255),
-                Color.argb(105, 30, 36, 53)
-            ),
-            floatArrayOf(0.0f, 0.48f, 1.0f),
-            Shader.TileMode.CLAMP
-        )
-        drawRoundRect(left, top, right, bottom, radius, radius, reliefPaint)
-        reliefPaint.shader = null
-        reliefPaint.color = Color.argb(150, 255, 255, 255)
-        reliefPaint.style = Paint.Style.STROKE
-        reliefPaint.strokeWidth = minOf(w, h) * 0.018f
-        drawRoundRect(
-            left + reliefPaint.strokeWidth, top + reliefPaint.strokeWidth,
-            right - reliefPaint.strokeWidth, bottom - reliefPaint.strokeWidth,
-            radius, radius, reliefPaint
-        )
-        reliefPaint.style = Paint.Style.FILL
-    }
     private var isAbleToScaleHorizontally = false
 
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
@@ -153,50 +115,104 @@ class EmojiView @JvmOverloads constructor(
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     override fun draw(canvas: Canvas) {
         super.draw(canvas)
-        canvas.run {
-            val bmpW = offscreenCanvasBitmap.width.toFloat()
-            val bmpH = offscreenCanvasBitmap.height.toFloat()
 
-            val sX = width.toFloat() / bmpW
-            val sY = height.toFloat() / bmpH
+        val artwork = if (raisedStyle) threeDBitmap else null
+        val bitmap = artwork ?: offscreenCanvasBitmap
+        if (width <= 0 || height <= 0 || bitmap.width <= 0 || bitmap.height <= 0) return
 
-            val scale = minOf(sX, sY)
-
-            val scaledW = (bmpW * scale / textScale).coerceAtMost(width.toFloat())
+        if (artwork != null) {
+            // Transparent, full-color Fluent 3D icon: never tint or paint a
+            // disc/card. It fits the available cell without cropping.
+            val inset = minOf(width, height) * 0.03f
+            val availableWidth = (width - inset * 2).coerceAtLeast(1.0f)
+            val availableHeight = (height - inset * 2).coerceAtLeast(1.0f)
+            val scale = minOf(availableWidth / bitmap.width, availableHeight / bitmap.height)
+            val targetWidth = bitmap.width * scale
+            val targetHeight = bitmap.height * scale
+            val left = (width - targetWidth) / 2f
+            val top = (height - targetHeight) / 2f
+            canvas.drawBitmap(
+                bitmap, null, RectF(left, top, left + targetWidth, top + targetHeight),
+                bitmapPaint
+            )
+            if (willDrawVariantIndicator && emoji?.skinTones == true) {
+                drawSkinToneIndicator(canvas)
+            }
+        } else {
+            // Compatibility fallback: the system's original Unicode glyph
+            // with NO 2.5D background, shadow, or painted circles.
+            val bmpW = bitmap.width.toFloat()
+            val bmpH = bitmap.height.toFloat()
+            val scale = minOf(width.toFloat() / bmpW, height.toFloat() / bmpH)
+            val scaledW = (bmpW * scale / textScale.coerceAtLeast(0.01f))
+                .coerceAtMost(width.toFloat())
             val scaledH = (bmpH * scale).coerceAtMost(height.toFloat())
-
-            val left = (width  - scaledW) / 2f
-            val top  = (height - scaledH) / 2f
-
-            drawBitmap(offscreenCanvasBitmap, null, RectF(left, top, left + scaledW, top + scaledH), bitmapPaint)
+            val left = (width - scaledW) / 2f
+            val top = (height - scaledH) / 2f
+            canvas.drawBitmap(
+                bitmap, null, RectF(left, top, left + scaledW, top + scaledH),
+                bitmapPaint
+            )
         }
+    }
+
+    private fun drawSkinToneIndicator(canvas: Canvas) {
+        val indicator = AppCompatResources.getDrawable(
+            context, R.drawable.variant_availability_indicator
+        ) ?: return
+        val indicatorWidth = context.resources.getDimensionPixelSize(
+            R.dimen.variant_availability_indicator_width
+        )
+        val indicatorHeight = context.resources.getDimensionPixelSize(
+            R.dimen.variant_availability_indicator_height
+        )
+        indicator.bounds = Rect(
+            width - indicatorWidth, height - indicatorHeight, width, height
+        )
+        indicator.draw(canvas)
     }
 
     var emoji: EmojiItem? = null
         set(value) {
             field = value
+            renderingToken++
+            val token = renderingToken
+            threeDBitmap = null
 
             post {
+                if (renderingToken != token) return@post
+                offscreenCanvasBitmap.eraseColor(Color.TRANSPARENT)
                 if (value != null) {
-                    if (value == this.emoji) {
-                        offscreenCanvasBitmap.eraseColor(Color.TRANSPARENT)
-                        drawEmoji(
-                            value.emoji,
-                            drawVariantIndicator = willDrawVariantIndicator && value.skinTones
-                        )
-                        contentDescription = value.emoji
+                    // Draw a legible Unicode fallback immediately.
+                    drawEmoji(
+                        value.emoji,
+                        drawVariantIndicator = willDrawVariantIndicator && value.skinTones
+                    )
+                    contentDescription = value.emoji
+                    if (raisedStyle) {
+                        FluentEmoji3D.request(
+                            context = context,
+                            value = value.emoji,
+                            category = value.category,
+                            description = value.description
+                        ) { bitmap ->
+                            // RecyclerView holders are reused; reject old image results.
+                            if (renderingToken == token && raisedStyle && emoji == value) {
+                                threeDBitmap = bitmap
+                                invalidate()
+                            }
+                        }
                     }
-                    invalidate()
                 } else {
-                    //offscreenCanvasBitmap.eraseColor(Color.TRANSPARENT)
+                    contentDescription = null
                 }
+                invalidate()
             }
         }
 
     private fun drawEmoji(emoji: CharSequence, drawVariantIndicator: Boolean) {
         //offscreenCanvasBitmap.eraseColor(Color.TRANSPARENT)
         offscreenCanvasBitmap.applyCanvas {
-            if (raisedStyle) drawRaisedEmojiSurface()
             if (emoji is Spanned) {
                 createStaticLayout(emoji, width).draw(this)
             } else {
@@ -228,12 +244,6 @@ class EmojiView @JvmOverloads constructor(
                 val textCenterY = height / 2f
                 val baselineY = textCenterY - textHeight / 2f - fm.ascent
 
-                if (raisedStyle) {
-                    textPaint.setShadowLayer(
-                        width * 0.025f, width * 0.014f, height * 0.022f,
-                        Color.argb(135, 0, 0, 0)
-                    )
-                }
                 drawText(
                     emoji,
                     /* start = */ 0,
@@ -242,7 +252,6 @@ class EmojiView @JvmOverloads constructor(
                     /* y = */ baselineY,
                     textPaint,
                 )
-                textPaint.clearShadowLayer()
             }
 
             if (drawVariantIndicator) {
