@@ -728,4 +728,27 @@ Default is %1$s</string>
     <string name="custom_emoji_cell_size">Emoji and emoticon size</string>
     <string name="custom_emoji_cell_size_desc">Resize emoji picker cells, ASCII emoticons and emoji predictions.</string>
     <string name="custom_emoji_relief">Original-color 3D emojis (Fluent)</string>
+    <string name="custom_theme_v2_action_icons">Action icons and microphone</string>
+    <string name="custom_theme_v2_action_icon_color">Action icon color</string>
+    <string name="custom_theme_v2_action_button_color">Action button background</string>
+    <string name="custom_theme_v2_action_button_text_color">Action button foreground</string>
+    <string name="custom_theme_v2_expanded_actions_color">Expanded action bar background</string>
+    <string name="custom_theme_v2_pick_image">Choose icon image</string>
+    <string name="custom_theme_v2_remove_image">Restore original icon</string>
+    <string name="custom_theme_v2_icon_assigned">Custom image selected</string>
+    <string name="custom_theme_v2_icon_none">Using original icon</string>
+    <string name="custom_theme_v2_icon_invalid">Image could not be loaded (PNG/WebP recommended, max. 2 MB).</string>
+    <string name="custom_theme_v2_icon_scale">Icon size in theme</string>
+    <string name="custom_theme_v2_preview_actions">Preview actions</string>
+    <string name="custom_theme_v2_mic">Microphone</string>
+    <string name="custom_theme_v2_undo">Undo</string>
+    <string name="custom_theme_v2_redo">Redo</string>
+    <string name="custom_theme_v2_copy">Copy</string>
+    <string name="custom_theme_v2_clipboard">Clipboard</string>
+    <string name="custom_theme_v2_settings">Settings</string>
+    <string name="custom_theme_v2_languages">Languages</string>
+    <string name="custom_theme_v2_themes">Themes</string>
+    <string name="custom_theme_v2_close">Close</string>
+    <string name="custom_theme_v2_tool_next">Next</string>
+    <string name="custom_theme_v2_no_tint_note">PNG/WebP images retain their original colors.</string>
 </resources>
