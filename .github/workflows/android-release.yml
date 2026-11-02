@@ -54,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/audit_spanish_resources.py \
-            --root . --out spanish-audit
+            --root . --out spanish-audit --strict-ui
 
       - uses: actions/setup-java@v4
         with:
