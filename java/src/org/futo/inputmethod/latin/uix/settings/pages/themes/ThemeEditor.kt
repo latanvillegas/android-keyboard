@@ -543,6 +543,142 @@ internal fun ThemeEditor(
                 }
             ),
             Tool(
+                R.string.custom_theme_v2_action_icons, R.drawable.mic_fill,
+                tool = @Composable {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val icons = listOf(
+                            "mic_fill" to R.string.custom_theme_v2_mic,
+                            "undo" to R.string.custom_theme_v2_undo,
+                            "redo" to R.string.custom_theme_v2_redo,
+                            "copy" to R.string.custom_theme_v2_copy,
+                            "clipboard" to R.string.custom_theme_v2_clipboard,
+                            "settings" to R.string.custom_theme_v2_settings,
+                            "globe" to R.string.custom_theme_v2_languages,
+                            "themes" to R.string.custom_theme_v2_themes,
+                            "close" to R.string.custom_theme_v2_close
+                        )
+                        Row(Modifier.horizontalScroll(rememberScrollState())) {
+                            icons.forEach { (key, label) ->
+                                FilterChip(
+                                    selected = selectedActionIcon == key,
+                                    onClick = { selectedActionIcon = key },
+                                    label = { Text(stringResource(label)) },
+                                    modifier = Modifier.padding(horizontal = 3.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            stringResource(
+                                if (actionIconPngs.containsKey(selectedActionIcon))
+                                    R.string.custom_theme_v2_icon_assigned
+                                else R.string.custom_theme_v2_icon_none
+                            )
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = {
+                                iconPickerTarget = selectedActionIcon
+                                pickActionIcon.launch("image/*")
+                            }) {
+                                Text(stringResource(R.string.custom_theme_v2_pick_image))
+                            }
+                            Button(onClick = {
+                                actionIconPngs.remove(selectedActionIcon)
+                                actionIconScales.remove(selectedActionIcon)
+                                iconImportFailed = false
+                            }) {
+                                Text(stringResource(R.string.custom_theme_v2_remove_image))
+                            }
+                        }
+                        if (iconImportFailed) {
+                            Text(stringResource(R.string.custom_theme_v2_icon_invalid))
+                        }
+                        Text(stringResource(R.string.custom_theme_v2_no_tint_note))
+                        SettingSliderForDataStoreItem(
+                            stringResource(R.string.custom_theme_v2_icon_scale),
+                            remember(selectedActionIcon, actionIconScales[selectedActionIcon]) {
+                                DataStoreItem(
+                                    value = actionIconScales[selectedActionIcon] ?: 1.0f,
+                                    setValue = { actionIconScales[selectedActionIcon] = it }
+                                )
+                            },
+                            default = 1.0f,
+                            range = 0.5f..2.5f,
+                            transform = { it },
+                            indicator = { "${(it * 100f).roundToInt()}%" }
+                        )
+                    }
+                }
+            ),
+            Tool(
+                R.string.custom_theme_v2_action_icon_color, R.drawable.themes,
+                tool = @Composable {
+                    Column {
+                        HctSliderPicker(actionIconHct) {
+                            actionIconHct = it
+                            actionIconColor = Color(Hct.from(
+                                it.hue.toDouble(), it.chroma.toDouble(), it.tone.toDouble()
+                            ).toInt())
+                        }
+                        Button(onClick = { actionIconColor = null }) {
+                            Text(stringResource(R.string.custom_suggestion_theme_reset_color))
+                        }
+                    }
+                }
+            ),
+            Tool(
+                R.string.custom_theme_v2_action_button_color, R.drawable.key_border,
+                tool = @Composable {
+                    Column {
+                        HctSliderPicker(actionButtonHct) {
+                            actionButtonHct = it
+                            actionButtonBackgroundColor = Color(Hct.from(
+                                it.hue.toDouble(), it.chroma.toDouble(), it.tone.toDouble()
+                            ).toInt())
+                        }
+                        Button(onClick = { actionButtonBackgroundColor = null }) {
+                            Text(stringResource(R.string.custom_suggestion_theme_reset_color))
+                        }
+                    }
+                }
+            ),
+            Tool(
+                R.string.custom_theme_v2_action_button_text_color, R.drawable.copy,
+                tool = @Composable {
+                    Column {
+                        HctSliderPicker(actionButtonForegroundHct) {
+                            actionButtonForegroundHct = it
+                            actionButtonForegroundColor = Color(Hct.from(
+                                it.hue.toDouble(), it.chroma.toDouble(), it.tone.toDouble()
+                            ).toInt())
+                        }
+                        Button(onClick = { actionButtonForegroundColor = null }) {
+                            Text(stringResource(R.string.custom_suggestion_theme_reset_color))
+                        }
+                    }
+                }
+            ),
+            Tool(
+                R.string.custom_theme_v2_expanded_actions_color, R.drawable.clipboard,
+                tool = @Composable {
+                    Column {
+                        HctSliderPicker(expandedBarHct) {
+                            expandedBarHct = it
+                            expandedActionsBarColor = Color(Hct.from(
+                                it.hue.toDouble(), it.chroma.toDouble(), it.tone.toDouble()
+                            ).toInt())
+                        }
+                        Button(onClick = { expandedActionsBarColor = null }) {
+                            Text(stringResource(R.string.custom_suggestion_theme_reset_color))
+                        }
+                    }
+                }
+            ),
+            Tool(
+                R.string.custom_theme_v2_preview_actions, R.drawable.clipboard_manager,
+                isActive = { previewActionsExpanded },
+                press = { previewActionsExpanded = !previewActionsExpanded }
+            ),
+            Tool(
                 R.string.theme_customizer_color_sliders_name, R.drawable.themes,
                 tool = @Composable {
                     HctSliderPicker(color) {
