@@ -1,0 +1,102 @@
+name: Publish verified vfork-stable-56 test APK
+
+# One-time release of the immutable, previously verified CI artifact.
+# Changes to other paths do not publish additional releases automatically.
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/publish-vfork-stable-56.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    name: Verify artifact and create GitHub prerelease
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      RELEASE_TAG: vfork-stable-56
+      SOURCE_RUN_ID: "41537785104"
+      SOURCE_SHA: ea8acd0125205245b88d219ef6331a700f2857f4
+    steps:
+      - name: Check out complete release notes
+        uses: actions/checkout@v4
+
+      - name: Fetch the successful Stable Release build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: futo-keyboard-stable-release-test-signed
+          repository: ${{ github.repository }}
+          run-id: 41537785104
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: release-dist
+
+      - name: Verify provenance and archive integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s release-dist/futo-keyboard-stable-release.apk
+          test -s release-dist/BUILD-INFO.txt
+          test -s release-dist/apk-signature.txt
+          test -s release-dist/apk-manifest.txt
+          test -s release-dist/SHA256SUMS
+          test -s release-dist/spanish-audit.json
+          test -s release-dist/spanish-audit.md
+          test -s release-dist/emoji-3d-verification.txt
+          test -s release-dist/FLUENT_EMOJI_LICENSE.txt
+          test -s docs/releases/vfork-stable-56.md
+          grep -Fx "commit=$SOURCE_SHA" release-dist/BUILD-INFO.txt
+          grep -Fx "workflow_run=$SOURCE_RUN_ID" release-dist/BUILD-INFO.txt
+          grep -Fx "variant=stableRelease" release-dist/BUILD-INFO.txt
+          grep -Fx "signing=test-signed" release-dist/BUILD-INFO.txt
+          (cd release-dist && sha256sum --check SHA256SUMS)
+          unzip -t release-dist/futo-keyboard-stable-release.apk | tail -n 1
+
+      - name: Prepare clearly labeled prerelease files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-ready
+          cp release-dist/futo-keyboard-stable-release.apk \
+            release-ready/futo-keyboard-vfork-stable-56-test-signed.apk
+          cp release-dist/BUILD-INFO.txt release-ready/
+          cp release-dist/apk-signature.txt release-ready/
+          cp release-dist/apk-manifest.txt release-ready/
+          cp release-dist/spanish-audit.json release-ready/
+          cp release-dist/spanish-audit.md release-ready/
+          cp release-dist/emoji-3d-verification.txt release-ready/
+          cp release-dist/FLUENT_EMOJI_LICENSE.txt release-ready/
+          (cd release-ready && sha256sum futo-keyboard-vfork-stable-56-test-signed.apk > SHA256SUMS)
+          cat release-ready/SHA256SUMS
+
+      - name: Publish as GitHub prerelease with full changelog
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; refusing to publish a duplicate."
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" \
+            release-ready/futo-keyboard-vfork-stable-56-test-signed.apk \
+            release-ready/SHA256SUMS \
+            release-ready/BUILD-INFO.txt \
+            release-ready/apk-signature.txt \
+            release-ready/apk-manifest.txt \
+            release-ready/spanish-audit.json \
+            release-ready/spanish-audit.md \
+            release-ready/emoji-3d-verification.txt \
+            release-ready/FLUENT_EMOJI_LICENSE.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SOURCE_SHA" \
+            --title "FUTO Keyboard Fork vfork-stable-56 — Theme Engine V2.2 (test-signed)" \
+            --notes-file docs/releases/vfork-stable-56.md \
+            --prerelease
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,tagName
