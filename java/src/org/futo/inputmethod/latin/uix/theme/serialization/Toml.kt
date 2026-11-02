@@ -4,6 +4,7 @@ import android.graphics.Rect
 import android.graphics.RectF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.compositeOver
@@ -25,6 +26,7 @@ import org.futo.inputmethod.latin.uix.KeyboardColorScheme
 import org.futo.inputmethod.latin.uix.theme.AdvancedThemeOptions
 import org.futo.inputmethod.latin.uix.theme.ThemeActionIcon
 import org.futo.inputmethod.latin.uix.theme.GenericPalette
+import org.futo.inputmethod.latin.uix.theme.KeyBackground
 import org.futo.inputmethod.latin.uix.theme.KeyIcon
 import org.futo.inputmethod.latin.uix.theme.ThemeDecodingContext
 import org.futo.inputmethod.latin.uix.theme.TonalPalette
@@ -88,6 +90,15 @@ private data class SerializedTomlFile(
         val suggestion_text_color: String? = null,
         val suggestion_bar_color: String? = null,
         val suggestion_divider_color: String? = null,
+        // Optional 9-slice PNGs; assets may reuse an existing [[asset.border]].
+        val suggestion_item_border: String? = null,
+        val suggestion_item_pressed_border: String? = null,
+        val suggestion_item_background_color: String? = null,
+        val suggestion_item_pressed_background_color: String? = null,
+        val suggestion_item_radius: LFloat = 12.0f,
+        val suggestion_item_inset_horizontal: LFloat = 3.0f,
+        val suggestion_item_inset_vertical: LFloat = 2.0f,
+        val suggestion_item_hide_dividers: Boolean = true,
         val weight_text: LFloat = 400.0f,
         val weight_hints: LFloat = 500.0f,
         val font: Font? = null,
@@ -303,6 +314,48 @@ private data class SerializedTomlFile(
     fun toKeyboardScheme(ctx: ThemeDecodingContext): KeyboardColorScheme {
         val palette = ctx.palette
         val backgroundImage = options.background?.let { decodeOptionalImage(ctx, it.image) }
+        // Shared 9-slice decoder: suggestion pills use exactly the same asset metadata
+        // and renderer as keyboard keys, preserving sharp corners when stretched.
+        fun decodeBorder(assetName: String, img: ImageBitmap): KeyBackground? {
+            val bitmap = img.asAndroidBitmap()
+            val meta = lookupBorder(assetName)
+            val scale = ctx.context.resources.displayMetrics.densityDpi / meta.target_density
+            val w = (bitmap.width * scale).roundToInt()
+            val h = (bitmap.height * scale).roundToInt()
+
+            val xRegions = mutableListOf<Pair<Int, Int>>()
+            val yRegions = mutableListOf<Pair<Int, Int>>()
+            val padding = Rect(0, 0, 0, 0)
+            val gap = RectF(1.0f, 1.0f, 1.0f, 1.0f)
+
+            if(meta.slicing.size == 4) {
+                xRegions.add((meta.slicing[0] * w).roundToInt() to (meta.slicing[2] * w).roundToInt())
+                yRegions.add((meta.slicing[1] * h).roundToInt() to (meta.slicing[3] * h).roundToInt())
+            }
+
+            if(meta.padding.size == 4) {
+                padding.left = (meta.padding[0] * w).roundToInt()
+                padding.top = (meta.padding[1] * h).roundToInt()
+                padding.right = ((1.0f - meta.padding[2]) * w).roundToInt()
+                padding.bottom = ((1.0f - meta.padding[3]) * h).roundToInt()
+            }
+
+            if(meta.gap.size == 4) {
+                gap.left = meta.gap[0]
+                gap.top = meta.gap[1]
+                gap.right = meta.gap[2]
+                gap.bottom = meta.gap[3]
+            }
+
+            return createNinePatchDrawable(
+                bitmap, scale, ctx.context.resources,
+                meta.foreground_tint.toColor(palette).toArgb(),
+                meta.background_tint.toColor(palette).toArgb(),
+                meta.outline_tint?.toColor(palette)?.toArgb(), meta.outline_width,
+                xRegions, yRegions, padding, gap
+            )
+        }
+
         return KeyboardColorScheme(
             base = ColorScheme(
                 primary                 = colors.primary.toColor(palette),
@@ -410,43 +463,20 @@ private data class SerializedTomlFile(
                             null
                         }
                     },
+                    suggestionItemBorder = options.suggestion_item_border?.let { name ->
+                        decodeOptionalImage(ctx, name)?.let { decodeBorder(name, it) }
+                    },
+                    suggestionItemPressedBorder = options.suggestion_item_pressed_border?.let { name ->
+                        decodeOptionalImage(ctx, name)?.let { decodeBorder(name, it) }
+                    },
+                    suggestionItemBackgroundColor = options.suggestion_item_background_color?.toColor(palette),
+                    suggestionItemPressedBackgroundColor = options.suggestion_item_pressed_background_color?.toColor(palette),
+                    suggestionItemRadius = options.suggestion_item_radius.takeIf { it.isFinite() }?.coerceIn(0.0f, 32.0f) ?: 12.0f,
+                    suggestionItemInsetHorizontal = options.suggestion_item_inset_horizontal.takeIf { it.isFinite() }?.coerceIn(0.0f, 16.0f) ?: 3.0f,
+                    suggestionItemInsetVertical = options.suggestion_item_inset_vertical.takeIf { it.isFinite() }?.coerceIn(0.0f, 16.0f) ?: 2.0f,
+                    suggestionItemHideDividers = options.suggestion_item_hide_dividers,
                     keyBackgrounds = decodeKeyedBitmaps(ctx, matchrules.border, keyFn={it.selector}, valFn={it.asset}) { cfg, img ->
-                        val bitmap = img.asAndroidBitmap()
-                        val meta = lookupBorder(cfg.asset)
-
-                        val scale = ctx.context.resources.displayMetrics.densityDpi / meta.target_density
-                        val w = (bitmap.width * scale).roundToInt()
-                        val h = (bitmap.height * scale).roundToInt()
-
-                        val xRegions = mutableListOf<Pair<Int, Int>>()
-                        val yRegions = mutableListOf<Pair<Int, Int>>()
-                        val padding = Rect(0, 0, 0, 0)
-                        val gap = RectF(1.0f, 1.0f, 1.0f, 1.0f)
-
-                        if(meta.slicing.size == 4) {
-                            xRegions.add((meta.slicing[0] * w).roundToInt() to(meta.slicing[2] * w).roundToInt())
-                            yRegions.add((meta.slicing[1] * h).roundToInt() to (meta.slicing[3] * h).roundToInt())
-                        }
-
-                        if(meta.padding.size == 4) {
-                            padding.left = (meta.padding[0] * w).roundToInt()
-                            padding.top = (meta.padding[1] * h).roundToInt()
-                            padding.right = ((1.0f-meta.padding[2]) * w).roundToInt()
-                            padding.bottom = ((1.0f-meta.padding[3]) * h).roundToInt()
-                        }
-
-                        if(meta.gap.size == 4) {
-                            gap.left = meta.gap[0]
-                            gap.top = meta.gap[1]
-                            gap.right = meta.gap[2]
-                            gap.bottom = meta.gap[3]
-                        }
-
-                        createNinePatchDrawable(bitmap, scale, ctx.context.resources,
-                            meta.foreground_tint.toColor(palette).toArgb(),
-                            meta.background_tint.toColor(palette).toArgb(),
-                            meta.outline_tint?.toColor(palette)?.toArgb(), meta.outline_width,
-                            xRegions, yRegions, padding, gap)
+                        decodeBorder(cfg.asset, img)
                     },
                     keyIcons = decodeKeyedBitmaps(ctx, matchrules.icon, keyFn={it.selector}, valFn={it.asset}) { cfg, img ->
                         KeyIcon(img.asAndroidBitmap().toDrawable(ctx.context.resources))

@@ -225,6 +225,15 @@ data class SerializableJsonTheme(
     val suggestionTextColor: SerializableJsonColor? = null,
     val suggestionBarColor: SerializableJsonColor? = null,
     val suggestionDividerColor: SerializableJsonColor? = null,
+    // JSON border images follow the existing 1px nine-patch keyBackgrounds format.
+    val suggestionItemBorder: String? = null,
+    val suggestionItemPressedBorder: String? = null,
+    val suggestionItemBackgroundColor: SerializableJsonColor? = null,
+    val suggestionItemPressedBackgroundColor: SerializableJsonColor? = null,
+    val suggestionItemRadius: Float = 12.0f,
+    val suggestionItemInsetHorizontal: Float = 3.0f,
+    val suggestionItemInsetVertical: Float = 2.0f,
+    val suggestionItemHideDividers: Boolean = true,
 
     val name: String? = null,
     val id: String? = null,
@@ -336,6 +345,16 @@ data class SerializableJsonTheme(
                     suggestionTextColor = suggestionTextColor?.toColor(),
                     suggestionBarColor = suggestionBarColor?.toColor(),
                     suggestionDividerColor = suggestionDividerColor?.toColor(),
+                    suggestionItemBorder = decodeOptionalImage(ctx, suggestionItemBorder)
+                        ?.asAndroidBitmap()?.toNinePatchDrawable(ctx.context.resources),
+                    suggestionItemPressedBorder = decodeOptionalImage(ctx, suggestionItemPressedBorder)
+                        ?.asAndroidBitmap()?.toNinePatchDrawable(ctx.context.resources),
+                    suggestionItemBackgroundColor = suggestionItemBackgroundColor?.toColor(),
+                    suggestionItemPressedBackgroundColor = suggestionItemPressedBackgroundColor?.toColor(),
+                    suggestionItemRadius = suggestionItemRadius.takeIf { it.isFinite() }?.coerceIn(0.0f, 32.0f) ?: 12.0f,
+                    suggestionItemInsetHorizontal = suggestionItemInsetHorizontal.takeIf { it.isFinite() }?.coerceIn(0.0f, 16.0f) ?: 3.0f,
+                    suggestionItemInsetVertical = suggestionItemInsetVertical.takeIf { it.isFinite() }?.coerceIn(0.0f, 16.0f) ?: 2.0f,
+                    suggestionItemHideDividers = suggestionItemHideDividers,
 
                     themeName = name,
                     themeAuthor = author
