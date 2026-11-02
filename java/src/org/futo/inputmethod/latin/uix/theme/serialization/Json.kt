@@ -25,6 +25,7 @@ import kotlinx.serialization.json.Json
 import org.futo.inputmethod.latin.uix.ExtraColors
 import org.futo.inputmethod.latin.uix.KeyboardColorScheme
 import org.futo.inputmethod.latin.uix.theme.AdvancedThemeOptions
+import org.futo.inputmethod.latin.uix.theme.ThemeActionIcon
 import org.futo.inputmethod.latin.uix.theme.KeyBackground
 import org.futo.inputmethod.latin.uix.theme.KeyIcon
 import org.futo.inputmethod.latin.uix.theme.ThemeDecodingContext
@@ -212,6 +213,14 @@ data class SerializableJsonTheme(
     val keysFont: String? = null,
     val actionMicIcon: String? = null,
     val actionMicIconScale: Float = 1.0f,
+    // Optional V2 action assets; legacy JSON remains readable.
+    val actionIcons: Map<String, String> = emptyMap(),
+    val actionIconScales: Map<String, Float> = emptyMap(),
+    val actionIconTints: Map<String, Boolean> = emptyMap(),
+    val actionIconColor: SerializableJsonColor? = null,
+    val actionButtonBackgroundColor: SerializableJsonColor? = null,
+    val actionButtonForegroundColor: SerializableJsonColor? = null,
+    val expandedActionsBarColor: SerializableJsonColor? = null,
     val suggestionFontScale: Float = 1.0f,
     val suggestionTextColor: SerializableJsonColor? = null,
     val suggestionBarColor: SerializableJsonColor? = null,
@@ -308,6 +317,21 @@ data class SerializableJsonTheme(
                     font = decodeOptionalFont(ctx, keysFont),
                     actionMicIcon = decodeOptionalImage(ctx, actionMicIcon),
                     actionMicIconScale = actionMicIconScale,
+                    actionIcons = actionIcons.entries.take(64).mapNotNull { (name, asset) ->
+                        if (!name.matches(Regex("[a-z][a-z0-9_]{0,79}"))) null
+                        else decodeOptionalImage(ctx, asset)?.let { image ->
+                            name to ThemeActionIcon(
+                                image = image,
+                                scale = actionIconScales[name]?.takeIf { it.isFinite() }
+                                    ?.coerceIn(0.2f, 5.0f) ?: 1.0f,
+                                tint = actionIconTints[name] == true
+                            )
+                        }
+                    }.toMap(),
+                    actionIconColor = actionIconColor?.toColor(),
+                    actionButtonBackgroundColor = actionButtonBackgroundColor?.toColor(),
+                    actionButtonForegroundColor = actionButtonForegroundColor?.toColor(),
+                    expandedActionsBarColor = expandedActionsBarColor?.toColor(),
                     suggestionFontScale = suggestionFontScale,
                     suggestionTextColor = suggestionTextColor?.toColor(),
                     suggestionBarColor = suggestionBarColor?.toColor(),
