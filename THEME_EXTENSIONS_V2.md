@@ -126,3 +126,44 @@ strings and formatting-placeholder mismatches.
 The workflow compiles `Stable Release` and runs JVM security regression
 tests. It does not produce a Debug APK. The build remains test-signed until
 the owner's production keystore is configured.
+
+## Suggestion candidate backgrounds (V2.1, optional)
+
+Each of the three dynamic suggestion candidates can now use the same 9-slice
+PNG borders already supported for normal keyboard keys. No image is baked
+with a suggestion word. Existing themes and prediction behavior are unchanged.
+
+Add these optional fields inside the existing `[options]` table:
+
+```toml
+[options]
+suggestion_item_border = "key_normal_3d.png"
+suggestion_item_pressed_border = "key_normal_pressed.png"
+suggestion_item_background_color = "#121924FF"
+suggestion_item_pressed_background_color = "#0B2639FF"
+suggestion_item_radius = 12.0
+suggestion_item_inset_horizontal = 3.0
+suggestion_item_inset_vertical = 2.0
+suggestion_item_hide_dividers = true
+```
+
+The files specified by `suggestion_item_border` and
+`suggestion_item_pressed_border` must be present in the theme ZIP and may
+reuse existing `[[asset.border]]` entries (with their `slicing`, `padding`,
+`gap`, and `target_density` values). If only a normal border is supplied,
+it remains visible while pressed. If either PNG fails to decode, the respective
+color fallback (if provided) remains usable. Transparent key PNGs are rendered
+over the configured color fill. Touch targets are not reduced by the visual
+insets. Values for radius and insets are clamped to safe ranges.
+
+For the native JSON format, use corresponding camelCase keys:
+`suggestionItemBorder`, `suggestionItemPressedBorder`,
+`suggestionItemBackgroundColor`, `suggestionItemPressedBackgroundColor`,
+`suggestionItemRadius`, `suggestionItemInsetHorizontal`,
+`suggestionItemInsetVertical`, and `suggestionItemHideDividers`.
+JSON border PNGs use the same one-pixel Android nine-patch marker format as
+the existing JSON `keyBackgrounds`.
+
+The V2.1 options only affect visual presentation of suggestions. The
+suggestions are still selected and predicted by the normal keyboard engine.
+
