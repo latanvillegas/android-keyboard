@@ -192,11 +192,11 @@ private fun actionDrawableEntryName(context: android.content.Context, id: Int): 
     }
 
 @Composable
-private fun themeActionIconFor(action: Action): org.futo.inputmethod.latin.uix.theme.ThemeActionIcon? {
+private fun themeActionIconFor(drawableId: Int): org.futo.inputmethod.latin.uix.theme.ThemeActionIcon? {
     val theme = LocalKeyboardScheme.current.extended.advancedThemeOptions
     val context = LocalContext.current
-    val key = remember(action.icon) { actionDrawableEntryName(context, action.icon) }
-    return key?.let { theme.actionIcons[it] } ?: if (action.icon == R.drawable.mic_fill) {
+    val key = remember(context, drawableId) { actionDrawableEntryName(context, drawableId) }
+    return key?.let { theme.actionIcons[it] } ?: if (drawableId == R.drawable.mic_fill) {
         theme.actionMicIcon?.let {
             org.futo.inputmethod.latin.uix.theme.ThemeActionIcon(it, theme.actionMicIconScale)
         }
@@ -204,8 +204,8 @@ private fun themeActionIconFor(action: Action): org.futo.inputmethod.latin.uix.t
 }
 
 @Composable
-private fun themedActionIconSize(action: Action, defaultSize: Dp): Dp {
-    val replacement = themeActionIconFor(action)
+private fun themedActionIconSize(drawableId: Int, defaultSize: Dp): Dp {
+    val replacement = themeActionIconFor(drawableId)
     val userScale = useDataStoreValue(ActionIconScaleSetting)
         .takeIf { it.isFinite() }?.coerceIn(0.2f, 5.0f) ?: 1.0f
     val themeScale = replacement?.scale?.takeIf { it.isFinite() }
@@ -216,17 +216,31 @@ private fun themedActionIconSize(action: Action, defaultSize: Dp): Dp {
 }
 
 @Composable
-private fun ThemedActionIcon(action: Action, defaultSize: Dp, tint: Color) {
+private fun themedActionIconSize(action: Action, defaultSize: Dp): Dp =
+    themedActionIconSize(action.icon, defaultSize)
+
+@Composable
+private fun ThemedActionIcon(drawableId: Int, contentDescription: String, defaultSize: Dp, tint: Color) {
     val theme = LocalKeyboardScheme.current.extended.advancedThemeOptions
-    val replacement = themeActionIconFor(action)
-    val size = themedActionIconSize(action, defaultSize)
+    val replacement = themeActionIconFor(drawableId)
+    val size = themedActionIconSize(drawableId, defaultSize)
     Icon(
         painter = replacement?.image?.let { BitmapPainter(it) }
-            ?: painterResource(id = action.icon),
-        contentDescription = stringResource(action.name),
+            ?: painterResource(id = drawableId),
+        contentDescription = contentDescription,
         tint = if (replacement != null && !replacement.tint) Color.Unspecified
             else theme.actionIconColor ?: tint,
         modifier = Modifier.size(size)
+    )
+}
+
+@Composable
+private fun ThemedActionIcon(action: Action, defaultSize: Dp, tint: Color) {
+    ThemedActionIcon(
+        drawableId = action.icon,
+        contentDescription = stringResource(action.name),
+        defaultSize = defaultSize,
+        tint = tint
     )
 }
 
@@ -782,24 +796,23 @@ fun ActionItems(onSelect: (Action) -> Unit, onLongSelect: (Action) -> Unit) {
 
 @Composable
 fun ExpandActionsButton(isActionsOpen: Boolean, onClick: () -> Unit) {
-    val bgCol = LocalKeyboardScheme.current.keyboardContainer
-    val fgCol = LocalKeyboardScheme.current.onKeyboardContainer
+    val advanced = LocalKeyboardScheme.current.extended.advancedThemeOptions
+    val bgCol = advanced.actionButtonBackgroundColor
+        ?: LocalKeyboardScheme.current.keyboardContainer
+    val fgCol = advanced.actionButtonForegroundColor
+        ?: LocalKeyboardScheme.current.onKeyboardContainer
+    val iconSize = themedActionIconSize(R.drawable.chevron_right, 20.dp)
+    val buttonWidth = maxOf(42.dp, iconSize + 8.dp)
 
     val circleRadius = with(LocalDensity.current) {
-        16.dp.toPx()
+        maxOf(16.dp, buttonWidth / 2f - 4.dp).toPx()
     }
 
     IconButton(
         onClick = onClick,
         modifier = Modifier
-            .width(42.dp)
-            .rotate(
-                if (isActionsOpen) {
-                    -90.0f
-                } else {
-                    0.0f
-                }
-            )
+            .width(buttonWidth)
+            .rotate(if (isActionsOpen) -90.0f else 0.0f)
             .fillMaxHeight()
             .drawBehind {
                 drawCircle(
@@ -808,16 +821,16 @@ fun ExpandActionsButton(isActionsOpen: Boolean, onClick: () -> Unit) {
                     style = Fill
                 )
             },
-
         colors = IconButtonDefaults.iconButtonColors(contentColor = fgCol)
     ) {
-        Icon(
-            painter = painterResource(id = R.drawable.chevron_right),
+        ThemedActionIcon(
+            drawableId = R.drawable.chevron_right,
             contentDescription = stringResource(
                 if (!isActionsOpen) R.string.keyboard_actionbar_expand_actions_talkback
                 else R.string.keyboard_actionbar_collapse_actions_talkback
             ),
-            Modifier.size(20.dp)
+            defaultSize = 20.dp,
+            tint = fgCol
         )
     }
 }
