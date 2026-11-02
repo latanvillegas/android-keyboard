@@ -88,6 +88,10 @@ public const val EXPORT_GGUF_MODEL_REQUEST = 80595439
 
 
 class SettingsActivity : ComponentActivity(), DynamicThemeProviderOwner {
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(UiLocalePreferences.wrapSettingsContext(newBase))
+    }
+
     private val themeOption: MutableState<ThemeOption?> = mutableStateOf(null)
 
     private val inputMethodEnabled = mutableStateOf(false)
