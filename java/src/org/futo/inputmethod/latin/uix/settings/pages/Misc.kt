@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import org.futo.inputmethod.latin.R
 import org.futo.inputmethod.latin.uix.SettingsExporter
+import org.futo.inputmethod.latin.uix.ReduceVisualEffectsSetting
+import org.futo.inputmethod.latin.uix.settings.useDataStore
+import org.futo.inputmethod.latin.uix.settings.PrimarySettingToggleDataStoreItem
 import org.futo.inputmethod.latin.uix.settings.UiLocalePreferences
 import org.futo.inputmethod.latin.uix.settings.UserSetting
 import org.futo.inputmethod.latin.uix.settings.NavigationItemStyle
@@ -31,6 +34,12 @@ val MiscMenu = UserSettingsMenu(
     title = R.string.misc_settings_title,
     navPath = "misc", registerNavPath = true,
     settings = listOf(
+        UserSetting(name = R.string.custom_theme_reduced_effects) {
+            PrimarySettingToggleDataStoreItem(
+                stringResource(R.string.custom_theme_reduced_effects),
+                useDataStore(ReduceVisualEffectsSetting)
+            )
+        },
         UserSetting(name = R.string.custom_ui_language_title) {
             val context = LocalContext.current
             var selected by remember { mutableStateOf(UiLocalePreferences.current(context)) }
