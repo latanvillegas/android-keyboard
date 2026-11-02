@@ -336,12 +336,18 @@ internal fun ThemeEditor(
                     stream.toByteArray()
                 }
 
+                path.startsWith("action-icons/") && path.endsWith(".png") ->
+                    actionIconPngs[path.removePrefix("action-icons/").removeSuffix(".png")]
                 else -> null
             }
 
-            override fun getFileHash(path: String): String? = null
+            override fun getFileHash(path: String): String? =
+                if (path.startsWith("action-icons/") && path.endsWith(".png")) {
+                    actionIconPngs[path.removePrefix("action-icons/").removeSuffix(".png")]
+                        ?.contentHashCode()?.toString()
+                } else null
             override fun close() {
-                TODO("Not yet implemented")
+                Unit
             }
 
         }
@@ -745,8 +751,10 @@ internal fun ThemeEditor(
                                                 onActionActivated = { },
                                                 onActionAltActivated = { },
                                                 inlineSuggestions = listOf(),
-                                                isActionsExpanded = false,
-                                                toggleActionsExpanded = { },
+                                                isActionsExpanded = previewActionsExpanded,
+                                                toggleActionsExpanded = {
+                                                    previewActionsExpanded = !previewActionsExpanded
+                                                },
                                             )
                                             Spacer(Modifier.Companion.height(4.dp))
                                         }
