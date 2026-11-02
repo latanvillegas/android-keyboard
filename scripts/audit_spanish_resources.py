@@ -14,7 +14,7 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-PLACEHOLDER = re.compile(r"%(?!%)(?:[1-9][0-9]*\\$)?[-+# 0,(]*[0-9]*(?:\\.[0-9]+)?[a-zA-Z]")
+PLACEHOLDER = re.compile(r"%(?!%)(?:[1-9][0-9]*\$)?[-+# 0,(]*[0-9]*(?:\.[0-9]+)?[a-zA-Z]")
 
 
 def read_strings(paths: list[Path], strict: bool = False) -> dict[str, tuple[str, str]]:
