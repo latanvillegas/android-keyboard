@@ -20,6 +20,7 @@ import org.futo.inputmethod.latin.uix.theme.serialization.TomlZipTheme
 import org.futo.inputmethod.latin.uix.theme.serialization.themeJson
 import org.futo.inputmethod.latin.utils.ZipFileHelper
 import org.futo.inputmethod.latin.utils.readAllBytesCompat
+import java.io.ByteArrayInputStream
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileNotFoundException
@@ -150,7 +151,9 @@ object ZipThemes {
         var error: String? = null
 
         try {
-            ZipFileHelper.parse(inputStream,
+            val compressed = ThemeZipSecurity.readBounded(inputStream)
+            ThemeZipSecurity.validate(compressed)
+            ZipFileHelper.parse(ByteArrayInputStream(compressed),
                 versionFileName to { bytes ->
                     val buff = ByteBuffer.wrap(bytes).apply { order(ByteOrder.LITTLE_ENDIAN) }
                     val version = buff.get()
@@ -187,7 +190,9 @@ object ZipThemes {
             )
 
             if(config == null) throw Exception("Config not found")
-            if(config?.id == null || (config?.id?.length ?: 0) < 3) throw Exception("ID must be at least 3 characters for a custom theme")
+            if(config?.id == null || !ThemeZipSecurity.validId(config!!.id!!)) {
+                throw Exception("Theme ID is missing, too long or contains an unsafe path")
+            }
             if(config?.id?.endsWith('_') == true) throw Exception("ID must not end with underscores")
         } catch(e: Exception) {
             error += "Cause: ${e.message}\n\nStack trace: ${e.stackTrace.map { it.toString() }}"
@@ -205,11 +210,8 @@ object ZipThemes {
         }
 
         val id = metadata.config.id!!
-        val file = File(customThemesDir(context), "${id}.zip")
-
-        file.outputStream().use { outputStream ->
-            inputStream.copyTo(outputStream)
-        }
+        // Import must validate the second stream, not just the preview stream.
+        ThemeZipSecurity.install(inputStream, customThemesDir(context), id)
 
         invalidateCache(custom(id))
 
