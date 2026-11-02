@@ -124,6 +124,7 @@ object ZipThemes {
         theme.backgroundImage?.let(putFile)
         theme.keysFont?.let(putFile)
         theme.actionMicIcon?.let(putFile)
+        theme.actionIcons.values.forEach(putFile)
         theme.keyBackgrounds.values.forEach(putFile)
         theme.keyIcons.values.forEach(putFile)
 
