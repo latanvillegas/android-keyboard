@@ -31,3 +31,8 @@ val EmojiCellSizeSetting = SettingsKey(
 val EmojiReliefSetting = SettingsKey(
     booleanPreferencesKey("custom_emoji_relief_3d"), true
 )
+
+/** Optional energy saver: skip continuously rendered theme shaders. */
+val ReduceVisualEffectsSetting = SettingsKey(
+    booleanPreferencesKey("reduce_visual_effects"), false
+)
