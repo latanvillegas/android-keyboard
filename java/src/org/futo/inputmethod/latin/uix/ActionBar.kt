@@ -11,6 +11,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -70,12 +73,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
@@ -373,6 +380,63 @@ fun RowScope.SuggestionItem(words: SuggestedWords, idx: Int, isPrimary: Boolean,
     val wordInfo = words.getInfoOrNull(idx)
     val isVerbatim = wordInfo?.kind == KIND_TYPED
     val word = wordInfo?.mWord
+    val advanced = LocalKeyboardScheme.current.extended.advancedThemeOptions
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val decorated = advanced.suggestionItemBorder != null ||
+        advanced.suggestionItemPressedBorder != null ||
+        advanced.suggestionItemBackgroundColor != null ||
+        advanced.suggestionItemPressedBackgroundColor != null
+
+    // Each visible candidate gets its own drawable bounds. Share image data but
+    // avoid sharing mutable NinePatch Drawable state between different candidates.
+    val normalBorder = remember(advanced.suggestionItemBorder) {
+        advanced.suggestionItemBorder?.background?.let { it.constantState?.newDrawable()?.mutate() ?: it }
+    }
+    val pressedBorder = remember(advanced.suggestionItemPressedBorder) {
+        advanced.suggestionItemPressedBorder?.background?.let { it.constantState?.newDrawable()?.mutate() ?: it }
+    }
+
+    val itemBackgroundModifier = if (!decorated) Modifier else Modifier.drawBehind {
+        if (word != null) {
+            val insetX = advanced.suggestionItemInsetHorizontal.dp.toPx().coerceAtMost(size.width / 2.0f)
+            val insetY = advanced.suggestionItemInsetVertical.dp.toPx().coerceAtMost(size.height / 2.0f)
+            val width = (size.width - insetX * 2.0f).coerceAtLeast(0.0f)
+            val height = (size.height - insetY * 2.0f).coerceAtLeast(0.0f)
+
+            if (width > 0.0f && height > 0.0f) {
+                val fillColor = if (isPressed) {
+                    advanced.suggestionItemPressedBackgroundColor ?: advanced.suggestionItemBackgroundColor
+                } else advanced.suggestionItemBackgroundColor
+                fillColor?.let {
+                    val radius = advanced.suggestionItemRadius.dp.toPx()
+                    drawRoundRect(
+                        color = it,
+                        topLeft = Offset(insetX, insetY),
+                        size = Size(width, height),
+                        cornerRadius = CornerRadius(radius, radius)
+                    )
+                }
+
+                val border = if (isPressed) pressedBorder ?: normalBorder else normalBorder
+                if (border != null) {
+                    drawIntoCanvas { canvas ->
+                        val native = canvas.nativeCanvas
+                        val saved = native.save()
+                        try {
+                            border.setBounds(
+                                insetX.toInt(), insetY.toInt(),
+                                (insetX + width).toInt(), (insetY + height).toInt()
+                            )
+                            border.draw(native)
+                        } finally {
+                            native.restoreToCount(saved)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     val isAutocorrect = forcePrimary || (isPrimary && words.mWillAutoCorrect)
 
@@ -433,10 +497,14 @@ fun RowScope.SuggestionItem(words: SuggestedWords, idx: Int, isPrimary: Boolean,
         .withCustomFont(potentiallyCompatEmojiFont)
 
     Box(
-        modifier = textButtonModifier
+        modifier = Modifier
             .weight(1.0f)
             .fillMaxHeight()
+            .then(itemBackgroundModifier)
+            .then(textButtonModifier)
             .combinedClickable(
+                interactionSource = interactionSource,
+                indication = if (decorated) null else LocalIndication.current,
                 enabled = word != null,
                 onClick = onClick,
                 onLongClick = onLongClick
@@ -471,6 +539,13 @@ fun RowScope.SuggestionItem(words: SuggestedWords, idx: Int, isPrimary: Boolean,
 }
 
 @Composable fun RowScope.SuggestionSeparator() {
+    val advanced = LocalKeyboardScheme.current.extended.advancedThemeOptions
+    val hasItemDecoration = advanced.suggestionItemBorder != null ||
+        advanced.suggestionItemPressedBorder != null ||
+        advanced.suggestionItemBackgroundColor != null ||
+        advanced.suggestionItemPressedBackgroundColor != null
+    if (hasItemDecoration && advanced.suggestionItemHideDividers) return
+
     Box(
         modifier = Modifier
             .fillMaxHeight(0.66f)
