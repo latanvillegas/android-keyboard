@@ -184,15 +184,32 @@ private fun adjustableSuggestionStyle(base: TextStyle, ratio: Float = 1.0f): Tex
     return base.copy(fontSize = fontSize.sp, lineHeight = (fontSize * 1.4f).sp)
 }
 
+private fun actionDrawableEntryName(context: android.content.Context, id: Int): String? =
+    try {
+        context.resources.getResourceEntryName(id)
+    } catch (_: android.content.res.Resources.NotFoundException) {
+        null
+    }
+
+@Composable
+private fun themeActionIconFor(action: Action): org.futo.inputmethod.latin.uix.theme.ThemeActionIcon? {
+    val theme = LocalKeyboardScheme.current.extended.advancedThemeOptions
+    val context = LocalContext.current
+    val key = remember(action.icon) { actionDrawableEntryName(context, action.icon) }
+    return key?.let { theme.actionIcons[it] } ?: if (action.icon == R.drawable.mic_fill) {
+        theme.actionMicIcon?.let {
+            org.futo.inputmethod.latin.uix.theme.ThemeActionIcon(it, theme.actionMicIconScale)
+        }
+    } else null
+}
+
 @Composable
 private fun themedActionIconSize(action: Action, defaultSize: Dp): Dp {
-    val theme = LocalKeyboardScheme.current.extended.advancedThemeOptions
-    val hasCustomMic = action.icon == R.drawable.mic_fill && theme.actionMicIcon != null
+    val replacement = themeActionIconFor(action)
     val userScale = useDataStoreValue(ActionIconScaleSetting)
         .takeIf { it.isFinite() }?.coerceIn(0.2f, 5.0f) ?: 1.0f
-    val themeScale = if (hasCustomMic) {
-        theme.actionMicIconScale.takeIf { it.isFinite() }?.coerceIn(0.2f, 5.0f) ?: 1.0f
-    } else 1.0f
+    val themeScale = replacement?.scale?.takeIf { it.isFinite() }
+        ?.coerceIn(0.2f, 5.0f) ?: 1.0f
     val availableHeight = (adjustableActionBarHeight().value - 4.0f).coerceAtLeast(4.0f)
     return (defaultSize.value * userScale * themeScale)
         .coerceIn(4.0f, minOf(96.0f, availableHeight)).dp
@@ -201,12 +218,14 @@ private fun themedActionIconSize(action: Action, defaultSize: Dp): Dp {
 @Composable
 private fun ThemedActionIcon(action: Action, defaultSize: Dp, tint: Color) {
     val theme = LocalKeyboardScheme.current.extended.advancedThemeOptions
-    val mic = if (action.icon == R.drawable.mic_fill) theme.actionMicIcon else null
+    val replacement = themeActionIconFor(action)
     val size = themedActionIconSize(action, defaultSize)
     Icon(
-        painter = mic?.let { BitmapPainter(it) } ?: painterResource(id = action.icon),
+        painter = replacement?.image?.let { BitmapPainter(it) }
+            ?: painterResource(id = action.icon),
         contentDescription = stringResource(action.name),
-        tint = if (mic != null) Color.Unspecified else tint,
+        tint = if (replacement != null && !replacement.tint) Color.Unspecified
+            else theme.actionIconColor ?: tint,
         modifier = Modifier.size(size)
     )
 }
@@ -615,7 +634,8 @@ fun LazyItemScope.ActionItem(idx: Int, action: Action, onSelect: (Action) -> Uni
         .width(width)
         .fillMaxHeight()
 
-    val contentCol = LocalKeyboardScheme.current.onBackground
+    val contentCol = LocalKeyboardScheme.current.extended.advancedThemeOptions.actionIconColor
+        ?: LocalKeyboardScheme.current.onBackground
 
     Box(modifier = modifier
         .clip(CircleShape)
@@ -629,8 +649,11 @@ fun LazyItemScope.ActionItem(idx: Int, action: Action, onSelect: (Action) -> Uni
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ActionItemSmall(action: Action, onSelect: (Action) -> Unit, onLongSelect: (Action) -> Unit) {
-    val bgCol = LocalKeyboardScheme.current.keyboardContainer
-    val fgCol = LocalKeyboardScheme.current.onKeyboardContainer
+    val advanced = LocalKeyboardScheme.current.extended.advancedThemeOptions
+    val bgCol = advanced.actionButtonBackgroundColor
+        ?: LocalKeyboardScheme.current.keyboardContainer
+    val fgCol = advanced.actionButtonForegroundColor
+        ?: LocalKeyboardScheme.current.onKeyboardContainer
 
     val width = maxOf(42.dp, themedActionIconSize(action, 16.dp) + 8.dp)
     val circleRadius = with(LocalDensity.current) {
@@ -911,7 +934,8 @@ fun ActionBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1.0f),
-                color = LocalKeyboardScheme.current.keyboardSurfaceDim//actionBarColor()
+                color = LocalKeyboardScheme.current.extended.advancedThemeOptions.expandedActionsBarColor
+                    ?: LocalKeyboardScheme.current.keyboardSurfaceDim
             ) {
                 ActionItems(onActionActivated, onActionAltActivated)
             }
