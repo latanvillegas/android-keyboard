@@ -108,3 +108,42 @@ jobs:
             --notes-file docs/releases/vfork-stable-56.md \
             --latest
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,tagName
+
+      - name: Attach SHA-256 verified Aurora V9 and Obsidian V2 ZIP themes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p theme-assets
+          base="https://raw.githubusercontent.com/latanvillegas/futo-keyboard-themes/6a1455c763d3ea90b34c604596f1d69501b7b112/dist"
+          aurora="Aurora_3D_V9_Colores_Teclado.zip"
+          obsidian="Obsidian3DTactile_FUTO_Original_Actualizado.zip"
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 120 \
+            "$base/$aurora" -o "theme-assets/$aurora"
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 120 \
+            "$base/$obsidian" -o "theme-assets/$obsidian"
+          printf '%s  %s\n' \
+            "9e7364082ae4c0301812981b66d102b5f2e27967b0081fad64409eafdbc2e281" "$aurora" \
+            > theme-assets/THEMES_SHA256SUMS
+          printf '%s  %s\n' \
+            "2ddd6f33f8dbc8aa65ff7da894d738d8f75f246f83cd44a48c68275fb260c91f" "$obsidian" \
+            >> theme-assets/THEMES_SHA256SUMS
+          (cd theme-assets && sha256sum --check THEMES_SHA256SUMS)
+          for file in "$aurora" "$obsidian"; do
+            unzip -t "theme-assets/$file" | tail -n 1
+            unzip -Z1 "theme-assets/$file" | grep -qx 'theme.txt'
+          done
+          gh release upload "$RELEASE_TAG" \
+            "theme-assets/$aurora" \
+            "theme-assets/$obsidian" \
+            "theme-assets/THEMES_SHA256SUMS" \
+            --repo "$GITHUB_REPOSITORY" --clobber
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+            | jq --arg a "$aurora" --arg b "$obsidian" -e '
+                [.assets[].name] as $names |
+                (($names | index($a)) != null) and
+                (($names | index($b)) != null) and
+                (($names | index("THEMES_SHA256SUMS")) != null) and
+                (($names | index("futo-keyboard-vfork-stable-56-test-signed.apk")) != null)
+              '
