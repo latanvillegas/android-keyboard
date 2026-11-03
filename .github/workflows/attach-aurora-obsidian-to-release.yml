@@ -1,0 +1,81 @@
+name: Attach Aurora and Obsidian theme ZIPs to vfork-stable-56
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/attach-aurora-obsidian-to-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  attach-themes:
+    name: Verify original ZIPs and attach them to GitHub Release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      RELEASE_TAG: vfork-stable-56
+      THEME_REPO_COMMIT: 6a1455c763d3ea90b34c604596f1d69501b7b112
+      AURORA_SHA256: 9e7364082ae4c0301812981b66d102b5f2e27967b0081fad64409eafdbc2e281
+      OBSIDIAN_SHA256: 2ddd6f33f8dbc8aa65ff7da894d738d8f75f246f83cd44a48c68275fb260c91f
+      AURORA_FILE: Aurora_3D_V9_Colores_Teclado.zip
+      OBSIDIAN_FILE: Obsidian3DTactile_FUTO_Original_Actualizado.zip
+    steps:
+      - name: Download pinned public theme archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p theme-assets
+          base="https://raw.githubusercontent.com/latanvillegas/futo-keyboard-themes/$THEME_REPO_COMMIT/dist"
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 120 \
+            "$base/$AURORA_FILE" -o "theme-assets/$AURORA_FILE"
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 120 \
+            "$base/$OBSIDIAN_FILE" -o "theme-assets/$OBSIDIAN_FILE"
+
+      - name: Check SHA-256, ZIP structure and TOML entrypoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf "%s  %s\n" "$AURORA_SHA256" "$AURORA_FILE" > theme-assets/THEMES_SHA256SUMS
+          printf "%s  %s\n" "$OBSIDIAN_SHA256" "$OBSIDIAN_FILE" >> theme-assets/THEMES_SHA256SUMS
+          (cd theme-assets && sha256sum --check THEMES_SHA256SUMS)
+
+          for name in "$AURORA_FILE" "$OBSIDIAN_FILE"; do
+            test -s "theme-assets/$name"
+            unzip -t "theme-assets/$name" | tail -n 1
+            unzip -Z1 "theme-assets/$name" | grep -qx 'theme.txt'
+          done
+          test "$(stat -c '%s' "theme-assets/$AURORA_FILE")" -eq 1257042
+          test "$(stat -c '%s' "theme-assets/$OBSIDIAN_FILE")" -eq 89125
+
+      - name: Upload verified ZIPs without touching APK or APK checksum
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release upload "$RELEASE_TAG" \
+            "theme-assets/$AURORA_FILE" \
+            "theme-assets/$OBSIDIAN_FILE" \
+            "theme-assets/THEMES_SHA256SUMS" \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Verify published theme release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+            | jq --arg a "$AURORA_FILE" --arg b "$OBSIDIAN_FILE" -e '
+                [.assets[].name] as $names |
+                (($names | index($a)) != null) and
+                (($names | index($b)) != null) and
+                (($names | index("THEMES_SHA256SUMS")) != null) and
+                (($names | index("futo-keyboard-vfork-stable-56-test-signed.apk")) != null)
+              '
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,assets
