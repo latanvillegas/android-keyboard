@@ -105,6 +105,8 @@ El flujo de compilación verificó la firma mediante `apksigner`, inspeccionó e
 
 **Adjuntos de esta publicación:** APK, `SHA256SUMS`, `BUILD-INFO.txt`, `apk-signature.txt`, `apk-manifest.txt`, `spanish-audit.json`, `spanish-audit.md`, `emoji-3d-verification.txt` y `FLUENT_EMOJI_LICENSE.txt`.
 
+**Temas ZIP disponibles en esta misma publicación:** `Aurora_3D_V9_Colores_Teclado.zip`, `Obsidian3DTactile_FUTO_Original_Actualizado.zip` y `THEMES_SHA256SUMS` (hashes de ambos temas).
+
 ## 7. Instalación y compatibilidad de firma
 
 1. Descarga `futo-keyboard-vfork-stable-56-test-signed.apk` de esta publicación y compara su SHA-256 con `SHA256SUMS`.
@@ -116,3 +118,40 @@ El flujo de compilación verificó la firma mediante `apksigner`, inspeccionó e
 **Alcance de la validación:** compilación y pruebas automatizadas superadas. La apariencia de cada tema de terceros y la posibilidad de actualizar sobre firmas distintas requieren validación en el dispositivo. El arte 3D no altera los caracteres de texto insertados.
 
 **Referencias de implementación:** [CUSTOMIZATION.md](https://github.com/latanvillegas/android-keyboard/blob/ea8acd0125205245b88d219ef6331a700f2857f4/CUSTOMIZATION.md) · [THIRD_PARTY_EMOJI_3D.md](https://github.com/latanvillegas/android-keyboard/blob/ea8acd0125205245b88d219ef6331a700f2857f4/THIRD_PARTY_EMOJI_3D.md) · [THEME_EXTENSIONS_V2.md](https://github.com/latanvillegas/android-keyboard/blob/ea8acd0125205245b88d219ef6331a700f2857f4/THEME_EXTENSIONS_V2.md).
+
+## 8. Temas 3D descargables — ZIP separados de la APK
+
+Esta publicación también distribuye los **archivos de tema listos para importar**. No son archivos APK y pueden descargarse individualmente.
+
+### Aurora Prism Hyperglass 3D V9
+
+**[Descargar Aurora 3D V9 — ZIP](https://github.com/latanvillegas/android-keyboard/releases/download/vfork-stable-56/Aurora_3D_V9_Colores_Teclado.zip)**
+
+- Teclas 3D Hyperglass multicolor y fondo Aurora, conservando el diseño original.
+- Una **única barra de sugerencias** de cristal con bordes 9-slice que se adapta a la orientación vertical u horizontal; las sugerencias se seleccionan de forma independiente.
+- **Expansión y micrófono** con recursos propios y estados normal/presionado, usando colores pastel coordinados con las teclas (cian y lavanda).
+- Controles y símbolos temáticos de la barra de acciones.
+- Versión del tema: **V9**. Tamaño: **1.257.042 bytes**.
+- SHA-256: `9e7364082ae4c0301812981b66d102b5f2e27967b0081fad64409eafdbc2e281`.
+
+### Obsidian 3D Tactile V2 — original actualizado
+
+**[Descargar Obsidian 3D Tactile V2 — ZIP](https://github.com/latanvillegas/android-keyboard/releases/download/vfork-stable-56/Obsidian3DTactile_FUTO_Original_Actualizado.zip)**
+
+- Teclas mecánicas 3D oscuras con relieve, sombras, efectos de pulsación y acentos cian.
+- Conserva los **nueve PNG originales de las teclas**, sin cambiar sus acabados.
+- Personalización de colores de sugerencias y barra de acciones, con iconos coordinados para micrófono y expansión.
+- Versión del tema: **V2**. Tamaño: **89.125 bytes**.
+- SHA-256: `2ddd6f33f8dbc8aa65ff7da894d738d8f75f246f83cd44a48c68275fb260c91f`.
+
+### Cómo instalar los temas
+
+1. Descarga **uno de los ZIP** desde los enlaces o desde «Assets» de esta Release.
+2. En la aplicación FUTO Keyboard Fork, abre **Configuración → Tema** e importa el ZIP.
+3. Selecciona el tema importado para activarlo.
+4. Comprueba las sugerencias y los botones de expansión/micrófono; para Aurora prueba también el teclado en horizontal.
+
+Para que los acabados de la barra completa y de los controles 3D se apliquen, utiliza una APK del fork con **motor de temas V2.2** (esta versión `vfork-stable-56` o una posterior compatible). La distribución oficial de FUTO puede ignorar estas extensiones.
+
+**Integridad:** los ZIP originales están igualmente almacenados en el [repositorio de temas del autor](https://github.com/latanvillegas/futo-keyboard-themes/tree/main/dist). Los hashes pueden verificarse con `THEMES_SHA256SUMS` adjunto. La APK y su SHA-256 original **no cambian** al añadir estos temas.
+
