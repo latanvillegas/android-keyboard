@@ -1,6 +1,6 @@
 # FUTO Keyboard Fork vfork-stable-56 — Fluent Emoji 3D + Temas V2.2
 
-> **Pre-release de pruebas.** APK Stable Release compilada correctamente, pero firmada con el certificado de **desarrollo** del repositorio (`test-signed`). **No es una actualización oficial de FUTO ni una versión firmada para distribución en producción.** Si tu APK instalada fue firmada con otra clave, Android no permitirá instalar esta versión directamente encima. Respalda configuración y datos antes de cambiar de instalación.
+> **Lanzamiento público experimental, APK test-signed.** APK Stable Release compilada correctamente, pero firmada con el certificado de **desarrollo** del repositorio (`test-signed`). **No es una actualización oficial de FUTO ni una versión firmada para distribución en producción.** Si tu APK instalada fue firmada con otra clave, Android no permitirá instalar esta versión directamente encima. Respalda configuración y datos antes de cambiar de instalación.
 
 **Esta versión reúne las mejoras del fork en gráficos de emoji 3D, personalización avanzada del teclado y barra de sugerencias, controles de tamaño, idiomas, accesibilidad y seguridad de los temas ZIP.** La novedad visual del teclado no modifica las palabras que escribe, el contenido insertado ni la lógica de predicción.
 

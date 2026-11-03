@@ -1,4 +1,4 @@
-name: Publish verified vfork-stable-56 test APK
+name: Feature verified vfork-stable-56 on repository Releases
 
 # Publish the immutable, verified build once; subsequent release-note updates
 # edit only the existing release metadata and preserve the APK attachments.
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   publish:
-    name: Verify artifact and create/update GitHub prerelease
+    name: Verify artifact and create/update experimental GitHub Release
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -75,7 +75,7 @@ jobs:
           (cd release-ready && sha256sum futo-keyboard-vfork-stable-56-test-signed.apk > SHA256SUMS)
           cat release-ready/SHA256SUMS
 
-      - name: Create or update GitHub prerelease with full changelog
+      - name: Feature experimental Release with full changelog
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -85,9 +85,10 @@ jobs:
             echo "Updating release description only; APK and hashes stay untouched."
             gh release edit "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "FUTO Keyboard Fork vfork-stable-56 — Fluent Emoji 3D + Temas V2.2 (test-signed)" \
+              --title "FUTO Keyboard Fork vfork-stable-56 — Fluent Emoji 3D + Temas V2.2 (TEST-SIGNED)" \
               --notes-file docs/releases/vfork-stable-56.md \
-              --prerelease
+              --prerelease=false \
+              --latest
             gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,tagName
             exit 0
           fi
@@ -103,7 +104,7 @@ jobs:
             release-ready/FLUENT_EMOJI_LICENSE.txt \
             --repo "$GITHUB_REPOSITORY" \
             --target "$SOURCE_SHA" \
-            --title "FUTO Keyboard Fork vfork-stable-56 — Fluent Emoji 3D + Temas V2.2 (test-signed)" \
+            --title "FUTO Keyboard Fork vfork-stable-56 — Fluent Emoji 3D + Temas V2.2 (TEST-SIGNED)" \
             --notes-file docs/releases/vfork-stable-56.md \
-            --prerelease
+            --latest
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,tagName
