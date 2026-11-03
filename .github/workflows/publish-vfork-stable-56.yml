@@ -1,13 +1,14 @@
 name: Publish verified vfork-stable-56 test APK
 
-# One-time release of the immutable, previously verified CI artifact.
-# Changes to other paths do not publish additional releases automatically.
+# Publish the immutable, verified build once; subsequent release-note updates
+# edit only the existing release metadata and preserve the APK attachments.
 on:
   push:
     branches:
       - master
     paths:
       - .github/workflows/publish-vfork-stable-56.yml
+      - docs/releases/vfork-stable-56.md
   workflow_dispatch:
 
 permissions:
@@ -16,7 +17,7 @@ permissions:
 
 jobs:
   publish:
-    name: Verify artifact and create GitHub prerelease
+    name: Verify artifact and create/update GitHub prerelease
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -74,14 +75,20 @@ jobs:
           (cd release-ready && sha256sum futo-keyboard-vfork-stable-56-test-signed.apk > SHA256SUMS)
           cat release-ready/SHA256SUMS
 
-      - name: Publish as GitHub prerelease with full changelog
+      - name: Create or update GitHub prerelease with full changelog
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $RELEASE_TAG already exists; refusing to publish a duplicate."
+            echo "Updating release description only; APK and hashes stay untouched."
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "FUTO Keyboard Fork vfork-stable-56 — Fluent Emoji 3D + Temas V2.2 (test-signed)" \
+              --notes-file docs/releases/vfork-stable-56.md \
+              --prerelease
+            gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,tagName
             exit 0
           fi
           gh release create "$RELEASE_TAG" \
@@ -96,7 +103,7 @@ jobs:
             release-ready/FLUENT_EMOJI_LICENSE.txt \
             --repo "$GITHUB_REPOSITORY" \
             --target "$SOURCE_SHA" \
-            --title "FUTO Keyboard Fork vfork-stable-56 — Theme Engine V2.2 (test-signed)" \
+            --title "FUTO Keyboard Fork vfork-stable-56 — Fluent Emoji 3D + Temas V2.2 (test-signed)" \
             --notes-file docs/releases/vfork-stable-56.md \
             --prerelease
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,tagName
