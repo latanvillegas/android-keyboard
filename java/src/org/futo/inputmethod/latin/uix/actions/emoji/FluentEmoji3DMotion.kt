@@ -19,7 +19,7 @@ internal object FluentEmoji3DMotion {
 
     private fun available(context: Context): Set<String> = synchronized(guard) {
         cachedKeys?.let { return@synchronized it }
-        val keys = try {
+        val keys = FluentHqPackStore.keys(context, ROOT) ?: try {
             context.applicationContext.assets.open("$ROOT/index.txt")
                 .bufferedReader().useLines { lines ->
                     lines.filter { validKey.matches(it) }.toHashSet()
@@ -29,6 +29,10 @@ internal object FluentEmoji3DMotion {
         }
         cachedKeys = keys
         keys
+    }
+
+    internal fun invalidateResources() = synchronized(guard) {
+        cachedKeys = null
     }
 
     fun hasAnimation(context: Context, assetKey: String): Boolean =
@@ -48,6 +52,11 @@ internal object FluentEmoji3DMotion {
     /** Compatibility option for receivers which do not accept animated WebP. */
     fun openGif(context: Context, assetKey: String): InputStream? {
         if (!hasAnimation(context, assetKey)) return null
-        return context.applicationContext.assets.open("$ROOT/$assetKey.gif")
+        FluentHqPackStore.openGif(context, assetKey)?.let { return it }
+        return try {
+            context.applicationContext.assets.open("$ROOT/$assetKey.gif")
+        } catch (_: FileNotFoundException) {
+            null
+        }
     }
 }

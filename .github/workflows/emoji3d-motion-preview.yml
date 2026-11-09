@@ -14,9 +14,9 @@ on:
   workflow_dispatch:
     inputs:
       lite:
-        description: "Build slim APK with GIF plus optional original RGBA HQ ZIP pack"
+        description: "Build core APK without ANY Fluent media plus all-four-catalog offline ZIP"
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
@@ -26,7 +26,7 @@ permissions:
 jobs:
   static-assets:
     name: Produce/cache 256px lossless RGBA static artwork
-    if: ${{ github.event_name == 'workflow_dispatch' || github.head_ref != 'feature/fluent3d-optional-hq-pack-lite-apk' }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.lite) || (github.event_name == 'pull_request' && github.head_ref != 'feature/fluent3d-optional-hq-pack-lite-apk') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -86,7 +86,7 @@ jobs:
 
   motion-assets:
     name: Produce/cache 30 genuine 256px lossless animations
-    if: ${{ github.event_name == 'workflow_dispatch' || github.head_ref != 'feature/fluent3d-optional-hq-pack-lite-apk' }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.lite) || (github.event_name == 'pull_request' && github.head_ref != 'feature/fluent3d-optional-hq-pack-lite-apk') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 110
     steps:
@@ -365,6 +365,12 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Unit-test full Fluent ZIP reproducibility without Android
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts -p test_fluent3d_full_pack.py -v
+
       - name: Build independently installable FULL fidelity Fluent asset pack
         shell: bash
         run: |
@@ -434,7 +440,7 @@ jobs:
           ./gradlew --no-daemon --build-cache --stacktrace \
             --warning-mode summary testStableReleaseUnitTest assembleStableRelease
 
-      - name: Verify APK, all GIFs, original external artwork and signature
+      - name: Verify APK contains no Fluent files and external pack preserves all media
         shell: bash
         run: |
           set -euo pipefail

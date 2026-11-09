@@ -137,6 +137,15 @@ jobs:
           du -h -s java/assets/emoji3d java/assets/emoji3d-share
           echo "3D Fluent UI and lossless 256px share assets staged: $count"
 
+      # Persist verified images before removing them from the APK build tree.
+      - uses: actions/cache/save@v4
+        if: steps.fluent3d-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            java/assets/emoji3d
+            java/assets/emoji3d-share
+          key: fluent3d-static128-share256-lossless-v3-7a40f1a2d064d76e436813edc0f09b6c8cde5da8-${{ hashFiles('scripts/build_emoji3d_assets.py') }}
+
       - uses: actions/cache@v4
         id: fluent-motion-cache
         with:
@@ -183,6 +192,12 @@ jobs:
           test -s java/assets/emoji3d-motion/1f62d.webp
           test -s java/assets/emoji3d-motion/1f62d.gif
           du -h -s java/assets/emoji3d-motion
+
+      - uses: actions/cache/save@v4
+        if: steps.fluent-motion-cache.outputs.cache-hit != 'true'
+        with:
+          path: java/assets/emoji3d-motion
+          key: fluent3d-motion-lossless-webp256-gif256-v3-daa0365c09795789ed2bc6e8b228c97736cb6669-${{ hashFiles('scripts/build_emoji3d_motion.py') }}
 
       - name: Export all Fluent 3D imagery into separately installable ZIP
         shell: bash
