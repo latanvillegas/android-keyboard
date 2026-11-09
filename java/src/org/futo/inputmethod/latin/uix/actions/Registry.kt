@@ -17,6 +17,7 @@ import org.futo.inputmethod.latin.uix.actions.clipboard.ClipboardHistoryAction
 import org.futo.inputmethod.latin.uix.actions.fonttyper.FontTyperAction
 import org.futo.inputmethod.latin.uix.actions.media.MediaHubAction
 import org.futo.inputmethod.latin.uix.actions.media.OfflineModelsAction
+import org.futo.inputmethod.latin.uix.actions.media.OfflineAiAction
 import org.futo.inputmethod.latin.uix.getSetting
 import org.futo.inputmethod.latin.uix.setSettingBlocking
 
@@ -48,6 +49,7 @@ val AllActionsMap = mapOf(
     // Append to preserve all original positional action codes.
     "media_hub" to MediaHubAction,
     "offline_models" to OfflineModelsAction,
+    "offline_ai" to OfflineAiAction,
 )
 
 val ActionToId = AllActionsMap.entries.associate { it.value to it.key }

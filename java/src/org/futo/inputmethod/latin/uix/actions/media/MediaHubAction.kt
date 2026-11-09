@@ -40,6 +40,7 @@ import org.futo.inputmethod.latin.R
 import org.futo.inputmethod.latin.uix.Action
 import org.futo.inputmethod.latin.uix.ActionWindow
 import org.futo.inputmethod.latin.uix.KeyboardManagerForAction
+import org.futo.inputmethod.latin.uix.settings.SettingsActivity
 
 /** User-customizable action, added without rewriting the existing emoji panel. */
 val MediaHubAction = Action(
@@ -77,6 +78,13 @@ private fun MediaHubPanel(manager: KeyboardManagerForAction) {
         }
     }
     var filter by remember { mutableStateOf(MediaFilter.ALL) }
+    val hqInstalled by produceState(
+        initialValue = FluentHqPackStore.isInstalled(context)
+    ) {
+        MediaLibrary.changes.collect {
+            value = FluentHqPackStore.isInstalled(context)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(6.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -105,6 +113,24 @@ private fun MediaHubPanel(manager: KeyboardManagerForAction) {
                 Text(stringResource(R.string.media_export))
             }
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(onClick = {
+                context.startActivity(
+                    Intent(context, GifEditorActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }) {
+                Text(stringResource(R.string.gif_editor_title))
+            }
+            TextButton(onClick = { manager.activateAction(OfflineAiAction) }) {
+                Text(stringResource(R.string.local_ai_title))
+            }
+        }
+        TextButton(onClick = {
+            SettingsActivity.openToNavDest(context, "models")
+        }) {
+            Text(stringResource(R.string.media_offline_models))
+        }
         Row(modifier = Modifier.fillMaxWidth()) {
             val filters = listOf(
                 MediaFilter.ALL to R.string.media_all,
@@ -119,6 +145,18 @@ private fun MediaHubPanel(manager: KeyboardManagerForAction) {
                         maxLines = 1
                     )
                 }
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (hqInstalled) stringResource(R.string.media_hq_ready)
+                else stringResource(R.string.media_hq_optional))
+            if (hqInstalled) {
+                TextButton(onClick = {
+                    manager.getLifecycleScope().launch {
+                        FluentHqPackStore.uninstall(context)
+                    }
+                }) { Text(stringResource(R.string.media_hq_remove)) }
             }
         }
 
@@ -165,6 +203,13 @@ private fun MediaHubPanel(manager: KeyboardManagerForAction) {
                             manager.getLifecycleScope().launch {
                                 MediaLibrary.delete(context, item.id)
                             }
+                        },
+                        onEdit = {
+                            context.startActivity(
+                                Intent(context, GifEditorActivity::class.java)
+                                    .putExtra("media_id", item.id)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
                         }
                     )
                 }
@@ -178,7 +223,8 @@ private fun MediaTile(
     item: MediaItem,
     onSend: () -> Unit,
     onFavorite: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEdit: () -> Unit
 ) {
     val context = LocalContext.current
     val bitmap by produceState<android.graphics.Bitmap?>(null, item.id) {
@@ -202,6 +248,11 @@ private fun MediaTile(
             }
         }
         Text(item.displayName, maxLines = 1)
+        if (item.kind == MediaKind.GIF) {
+            TextButton(onClick = onEdit) {
+                Text(stringResource(R.string.gif_editor_edit))
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onFavorite) {
                 Text(if (item.favorite) "★" else "☆")

@@ -9,10 +9,12 @@ import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import org.futo.inputmethod.latin.uix.actions.media.FluentHqPackStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -23,7 +25,7 @@ import java.util.concurrent.Executors
  *
  * Source: microsoft/fluentui-emoji (MIT), organized by Unicode in
  * shuding/fluentui-emoji-unicode. Images and the attribution notice are
- * packaged into the Release APK at build time. There are no network calls.
+ * distributed in an optional verified offline ZIP, not inside the APK.
  *
  * Missing assets fall back to the system Unicode renderer; skin tones are
  * NEVER silently changed to the default tone.
@@ -42,10 +44,29 @@ object FluentEmoji3D {
     private val pending = HashMap<String, MutableList<(Bitmap?) -> Unit>>()
     private val failed = HashSet<String>()
     private var available: Set<String>? = null
+    private var generation = 0
+    internal val resourceRevision = mutableIntStateOf(0)
+
+    /** Refresh indexes, bitmaps and pending requests after a pack change. */
+    internal fun invalidateResources() {
+        val listeners = synchronized(lock) {
+            generation++
+            available = null
+            failed.clear()
+            cache.evictAll()
+            val waiting = pending.values.flatten()
+            pending.clear()
+            waiting
+        }
+        main.post {
+            resourceRevision.intValue++
+            listeners.forEach { it(null) }
+        }
+    }
 
     private fun availableKeys(context: Context): Set<String> = synchronized(lock) {
         available?.let { return@synchronized it }
-        val loaded = try {
+        val loaded = FluentHqPackStore.keys(context, ROOT) ?: try {
             context.assets.open("$ROOT/index.txt").bufferedReader().useLines { lines ->
                 lines.filter { it.isNotBlank() }.toHashSet()
             }
@@ -116,7 +137,8 @@ object FluentEmoji3D {
     }
 
     private fun decode(context: Context, key: String): Bitmap? = try {
-        context.assets.open("$ROOT/$key.webp").use { input ->
+        (FluentHqPackStore.openPicker(context, key)
+            ?: context.assets.open("$ROOT/$key.webp")).use { input ->
             BitmapFactory.decodeStream(input, null, BitmapFactory.Options().apply {
                 inPreferredConfig = Bitmap.Config.ARGB_8888
                 inScaled = false
@@ -148,7 +170,8 @@ object FluentEmoji3D {
     ): Bitmap? {
         val key = assetKey(context, value, category, description) ?: return null
         val highQuality = try {
-            context.applicationContext.assets.open("emoji3d-share/$key.webp").use { input ->
+            (FluentHqPackStore.openShare(context, key)
+                ?: context.applicationContext.assets.open("emoji3d-share/$key.webp")).use { input ->
                 BitmapFactory.decodeStream(input, null, BitmapFactory.Options().apply {
                     inPreferredConfig = Bitmap.Config.ARGB_8888
                     inScaled = false
@@ -168,15 +191,17 @@ object FluentEmoji3D {
         description: String? = null
     ): Bitmap? {
         val key = resolve(context, value, category, description) ?: return null
-        synchronized(lock) {
+        val version = synchronized(lock) {
             cache.get(key)?.let { return it }
             if (failed.contains(key)) return null
+            generation
         }
         val decoded = decode(context.applicationContext, key)
-        synchronized(lock) {
+        return synchronized(lock) {
+            if (version != generation) return@synchronized null
             if (decoded != null) cache.put(key, decoded) else failed.add(key)
+            decoded
         }
-        return decoded
     }
 
     /** Coalesces concurrent scrolling requests and delivers callbacks on the main thread. */
@@ -193,6 +218,8 @@ object FluentEmoji3D {
             onReady(null)
             return
         }
+        val requestListeners: MutableList<(Bitmap?) -> Unit>
+        val version: Int
         synchronized(lock) {
             cache.get(key)?.let {
                 onReady(it)
@@ -207,16 +234,24 @@ object FluentEmoji3D {
                 listeners.add(onReady)
                 return
             }
-            pending[key] = mutableListOf(onReady)
+            requestListeners = mutableListOf(onReady)
+            pending[key] = requestListeners
+            version = generation
         }
         workers.execute {
             val bitmap = decode(application, key)
             val listeners = synchronized(lock) {
-                if (bitmap != null) cache.put(key, bitmap) else failed.add(key)
-                pending.remove(key).orEmpty()
+                if (version != generation || pending[key] !== requestListeners) {
+                    emptyList()
+                } else {
+                    if (bitmap != null) cache.put(key, bitmap) else failed.add(key)
+                    pending.remove(key).orEmpty()
+                }
             }
-            main.post {
-                listeners.forEach { listener -> listener(bitmap) }
+            if (listeners.isNotEmpty()) {
+                main.post {
+                    listeners.forEach { listener -> listener(bitmap) }
+                }
             }
         }
     }
@@ -233,7 +268,10 @@ fun FluentEmoji3DImage(
     fallback: @Composable () -> Unit
 ) {
     val context = LocalContext.current.applicationContext
-    val bitmap = produceState<Bitmap?>(null, emoji, enabled, category, description) {
+    val revision = FluentEmoji3D.resourceRevision.intValue
+    val bitmap = produceState<Bitmap?>(
+        null, emoji, enabled, category, description, revision
+    ) {
         value = if (enabled) withContext(Dispatchers.IO) {
             FluentEmoji3D.loadBitmap(context, emoji, category, description)
         } else {

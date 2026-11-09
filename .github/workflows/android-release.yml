@@ -137,6 +137,15 @@ jobs:
           du -h -s java/assets/emoji3d java/assets/emoji3d-share
           echo "3D Fluent UI and lossless 256px share assets staged: $count"
 
+      # Persist verified images before removing them from the APK build tree.
+      - uses: actions/cache/save@v4
+        if: steps.fluent3d-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            java/assets/emoji3d
+            java/assets/emoji3d-share
+          key: fluent3d-static128-share256-lossless-v3-7a40f1a2d064d76e436813edc0f09b6c8cde5da8-${{ hashFiles('scripts/build_emoji3d_assets.py') }}
+
       - uses: actions/cache@v4
         id: fluent-motion-cache
         with:
@@ -183,6 +192,27 @@ jobs:
           test -s java/assets/emoji3d-motion/1f62d.webp
           test -s java/assets/emoji3d-motion/1f62d.gif
           du -h -s java/assets/emoji3d-motion
+
+      - uses: actions/cache/save@v4
+        if: steps.fluent-motion-cache.outputs.cache-hit != 'true'
+        with:
+          path: java/assets/emoji3d-motion
+          key: fluent3d-motion-lossless-webp256-gif256-v3-daa0365c09795789ed2bc6e8b228c97736cb6669-${{ hashFiles('scripts/build_emoji3d_motion.py') }}
+
+      - name: Export all Fluent 3D imagery into separately installable ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-dist
+          python3 -u scripts/build_fluent3d_hq_pack.py \
+            --preview java/assets/emoji3d \
+            --share java/assets/emoji3d-share \
+            --motion java/assets/emoji3d-motion \
+            --out release-dist/fluent3d-full-offline-collection.zip
+          rm -rf java/assets/emoji3d java/assets/emoji3d-share java/assets/emoji3d-motion
+          for folder in emoji3d emoji3d-share emoji3d-motion; do
+            test ! -e "java/assets/$folder"
+          done
 
       - name: Configure production signing if secrets exist
         id: signing
@@ -269,46 +299,45 @@ jobs:
             | tee release-dist/apk-manifest.txt
           unzip -t release-dist/futo-keyboard-stable-release.apk \
             | tail -n 1 | tee release-dist/zip-integrity.txt
-          asset_count="$(unzip -p release-dist/futo-keyboard-stable-release.apk \
-            assets/emoji3d/index.txt | wc -l)"
-          if (( asset_count < 2500 )); then
-            echo "::error::Release APK does not contain the complete Fluent 3D asset pack."
-            exit 1
-          fi
-          printf 'Fluent 3D artwork entries in APK: %s\\n' "$asset_count" \
-            | tee release-dist/emoji-3d-verification.txt
-          unzip -p release-dist/futo-keyboard-stable-release.apk \
-            assets/emoji3d/LICENSE.txt > release-dist/FLUENT_EMOJI_LICENSE.txt
-          share_count="$(unzip -p release-dist/futo-keyboard-stable-release.apk \
-            assets/emoji3d-share/index.txt | wc -l)"
-          test "$share_count" -eq "$asset_count"
-          unzip -p release-dist/futo-keyboard-stable-release.apk \
-            assets/emoji3d-share/LICENSE.txt > release-dist/FLUENT_EMOJI_HQ_LICENSE.txt
-          gif_count="$(unzip -p release-dist/futo-keyboard-stable-release.apk \
-            assets/emoji3d-motion/index.txt | wc -l)"
-          if (( gif_count != 30 )); then
-            echo "::error::APK has $gif_count animated Fluent assets; expected 30."
-            exit 1
-          fi
-          unzip -p release-dist/futo-keyboard-stable-release.apk \
-            assets/emoji3d-motion/1f600.webp | \
-            python3 -c 'import sys; h=sys.stdin.buffer.read(); assert h[:4]==b"RIFF" and h[8:12]==b"WEBP"'
-          unzip -p release-dist/futo-keyboard-stable-release.apk \
-            assets/emoji3d-motion/LICENSE.txt > release-dist/FLUENT_EMOJI_ANIMATED_LICENSE.txt
-          (cd release-dist && sha256sum futo-keyboard-stable-release.apk) \
-            | tee release-dist/SHA256SUMS
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile
+          apk = Path("release-dist/futo-keyboard-stable-release.apk")
+          pack = Path("release-dist/fluent3d-full-offline-collection.zip")
+          forbidden = ("assets/emoji3d/", "assets/emoji3d-share/",
+                       "assets/emoji3d-motion/")
+          with ZipFile(apk) as source:
+              for name in source.namelist():
+                  assert not name.startswith(forbidden), name
+          with ZipFile(pack) as archive:
+              metadata = json.loads(archive.read("fluent-hq.json"))
+              assert metadata["format"] == "fluent3d-full-v2"
+              assert metadata["ui_count"] >= 2500
+              assert metadata["share_count"] == metadata["ui_count"]
+              assert metadata["motion_count"] == 30
+              checksums = metadata["members"]
+              assert len(checksums) == 2 * metadata["ui_count"] + 2 * 30 + 9
+              for name, expected in checksums.items():
+                  digest = hashlib.sha256()
+                  with archive.open(name) as stream:
+                      for chunk in iter(lambda: stream.read(1048576), b""):
+                          digest.update(chunk)
+                  assert digest.hexdigest() == expected, name
+          print("Release APK contains zero Fluent media. All four external "
+                "catalogs passed SHA-256 verification.")
+          PY
+          (cd release-dist && sha256sum \
+            futo-keyboard-stable-release.apk \
+            fluent3d-full-offline-collection.zip) > release-dist/SHA256SUMS
           printf '%s\n' \
             "commit=$GITHUB_SHA" \
             "workflow_run=$GITHUB_RUN_ID" \
-            "variant=stableRelease" \
+            "variant=stableRelease-no-bundled-Fluent-assets" \
             "signing=$SIGNING_KIND" \
-            "emoji3d=Microsoft Fluent Emoji prerendered 3D" \
-            "emoji3d_source=shuding/fluentui-emoji-unicode@7a40f1a2d064d76e436813edc0f09b6c8cde5da8" \
-            "emoji3d_count=$asset_count" \
-            "emoji3d_share_rgba_lossless_count=$share_count" \
-            "emoji3d_animated_webp=lossless-256px-RGBA" \
-            "emoji3d_motion_source=microsoft/fluentui-emoji-animated@daa0365c09795789ed2bc6e8b228c97736cb6669" \
-            "emoji3d_motion_count=30" \
+            "fluent_3d=external_installable_full_quality_pack" \
+            "fluent_3d_catalogs=2980_ui+2980_rgba256+30_animated_webp+30_gif" \
             > release-dist/BUILD-INFO.txt
 
       - name: Publish Stable Release artifact
