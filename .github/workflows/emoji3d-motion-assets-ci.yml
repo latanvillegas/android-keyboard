@@ -1,21 +1,26 @@
-name: Verify lossless Fluent RGBA animated assets
+name: Verify Fluent 3D animated WebP and static RGBA codecs
 
 on:
   pull_request:
     paths:
       - "scripts/build_emoji3d_motion.py"
+      - "scripts/build_emoji3d_assets.py"
       - ".github/workflows/emoji3d-motion-assets-ci.yml"
+      - ".github/workflows/emoji3d-motion-preview.yml"
       - ".github/workflows/android-release.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Codec regression uses generated transparent test fixtures and completes
+# quickly. Real-source animation and full Unicode catalogs are audited in
+# the preview workflow's independently cached asset jobs and final APK check.
 jobs:
-  fluent-animation:
-    name: Verify source animation frames, lossless WebP and GIF fallback
+  codec-regression:
+    name: Verify lossless RGBA encoding with genuine multi-frame APNG fixture
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,60 +32,84 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install pinned animation converter
+      - name: Install pinned Pillow
         run: python -m pip install --disable-pip-version-check Pillow==11.3.0
 
-      - name: Fetch only the selected MIT-licensed original Microsoft animations
+      - name: Test transparent APNG -> true Animated WebP + GIF
         shell: bash
         run: |
           set -euo pipefail
-          git lfs version
-          MOTION_SHA=daa0365c09795789ed2bc6e8b228c97736cb6669
-          MOTION_DIR="$RUNNER_TEMP/fluentui-emoji-animated"
-          GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 --filter=blob:none --no-checkout \
-            https://github.com/microsoft/fluentui-emoji-animated.git "$MOTION_DIR"
-          (
-            cd "$MOTION_DIR"
-            git -c protocol.version=2 fetch --depth 1 origin "$MOTION_SHA"
-            GIT_LFS_SKIP_SMUDGE=1 git checkout --detach "$MOTION_SHA"
-            git lfs pull --include="$(python "$GITHUB_WORKSPACE/scripts/build_emoji3d_motion.py" --list-source-paths)" --exclude=""
-          )
-          python scripts/build_emoji3d_motion.py \
-            --source "$MOTION_DIR" \
-            --dest "$RUNNER_TEMP/emoji3d-motion"
-
-      - name: Verify actual RGBA animation, resolution and compatible GIF
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -s "$RUNNER_TEMP/emoji3d-motion/LICENSE.txt"
-          test -s "$RUNNER_TEMP/emoji3d-motion/SOURCE.json"
-          test "$(wc -l < "$RUNNER_TEMP/emoji3d-motion/index.txt")" -eq 30
           python - <<'PY'
-          import json, os
+          import runpy
           from pathlib import Path
-          from PIL import Image
-          root = Path(os.environ["RUNNER_TEMP"]) / "emoji3d-motion"
-          manifest = json.loads((root / "SOURCE.json").read_text())
-          assert manifest["count"] == 30
-          assert len(manifest["assets"]) == 30
-          webp_total = gif_total = 0
-          for key, info in manifest["assets"].items():
-              assert info["size"] == 256, key
-              for extension in ("webp", "gif"):
-                  path = root / (key + "." + extension)
+          from tempfile import TemporaryDirectory
+          from PIL import Image, ImageDraw
+
+          script = runpy.run_path("scripts/build_emoji3d_motion.py")
+          convert_apng = script["convert_apng"]
+
+          with TemporaryDirectory() as temp:
+              root = Path(temp)
+              apng = root / "source.png"
+              frames = []
+              for i in range(5):
+                  frame = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+                  draw = ImageDraw.Draw(frame)
+                  draw.ellipse((30 + i * 12, 30, 130 + i * 12, 130),
+                               fill=(220, 120 + i * 12, 64, 210))
+                  draw.rectangle((70, 140, 170, 210),
+                                 fill=(40 + i * 10, 180, 220, 255))
+                  frames.append(frame)
+              frames[0].save(
+                  apng, "PNG", save_all=True, append_images=frames[1:],
+                  duration=[80] * len(frames), loop=0
+              )
+              webp = root / "sample.webp"
+              gif = root / "sample.gif"
+              result = convert_apng(apng, webp, gif)
+              assert result["webp_frames"] >= 2, result
+              assert result["gif_frames"] >= 2, result
+              assert result["duration_ms"] == 5 * 80, result
+              for path, name in ((webp, "WEBP"), (gif, "GIF")):
                   with Image.open(path) as image:
-                      assert image.format == extension.upper(), path
-                      assert image.size == (256, 256), path
-                      assert image.n_frames >= 2, path
+                      assert image.format == name
+                      assert image.size == (256, 256)
+                      assert image.n_frames >= 2
                       image.seek(0)
-                      assert image.convert("RGBA").getchannel("A").getextrema()[0] < 255, path
-                  if extension == "webp":
-                      assert info["webp_frames"] >= info["gif_frames"]
-                      webp_total += path.stat().st_size
-                  else:
-                      gif_total += path.stat().st_size
-          print(f"Validated 30 true animated RGBA 256px WebP files "
-                f"({webp_total / 1048576:.1f} MiB) and 30 GIF fallbacks "
-                f"({gif_total / 1048576:.1f} MiB)")
+                      assert image.convert("RGBA").getchannel("A").getextrema()[0] < 255
+              print("Codec verified: 256px RGBA Animated WebP and GIF.")
+          PY
+
+      - name: Test lossless static sharing independently of UI preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import runpy
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+          from PIL import Image, ImageDraw
+
+          script = runpy.run_path("scripts/build_emoji3d_assets.py")
+          convert_single = script["convert_single"]
+          with TemporaryDirectory() as temp:
+              root = Path(temp)
+              source = root / "1f600_3d.png"
+              picker = root / "ui"
+              sharing = root / "share"
+              picker.mkdir()
+              sharing.mkdir()
+              original = Image.new("RGBA", (320, 320), (0, 0, 0, 0))
+              draw = ImageDraw.Draw(original)
+              draw.ellipse((25, 20, 295, 290), fill=(240, 170, 40, 215))
+              original.save(source)
+              key, low, high = convert_single((source, picker, sharing))
+              assert key == "1f600"
+              assert low > 0 and high > 0
+              with Image.open(picker / "1f600.webp") as image:
+                  assert image.size == (128, 128)
+              with Image.open(sharing / "1f600.webp") as image:
+                  assert image.size == (256, 256)
+                  assert image.getchannel("A").getextrema()[0] < 255
+              print("Static codec verified: 128px picker, 256px lossless RGBA share.")
           PY
