@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 import org.futo.inputmethod.latin.uix.KeyboardManagerForAction
 
 /**
- * Sends real animated Fluent artwork where supported, followed by static
+ * Sends lossless RGBA animated WebP where supported, then animated GIF and static
  * 3D and exact Unicode fallbacks. Each key tap is committed at most once.
  *
  * Returning IMAGE_ACCEPTED / ANIMATION_ACCEPTED means the editor accepted
@@ -33,6 +33,7 @@ internal object SmartEmojiTransport {
     ): List<String> {
         if (!useThreeD) return emptyList()
         return listOf(
+            Emoji3DShareStore.ANIMATED_WEBP_MIME_TYPE,
             Emoji3DShareStore.ANIMATED_MIME_TYPE,
             Emoji3DShareStore.MIME_TYPE
         ).filter(accepts)
@@ -49,21 +50,28 @@ internal object SmartEmojiTransport {
         }
 
         if (useThreeD) {
-            // Never send animation to a receiver that only advertises static PNG.
+            // Prefer lossless RGBA animation, then GIF, then lossless static PNG.
             for (mime in preferredMimeTypes(useThreeD) {
                 manager.appSupportsImageInsertion(it, true)
             }) {
-                val animated = mime == Emoji3DShareStore.ANIMATED_MIME_TYPE
+                val animated = mime != Emoji3DShareStore.MIME_TYPE
 
                 val uri = try {
                     withContext(Dispatchers.IO) {
-                        if (animated) {
-                            Emoji3DShareStore.prepareAnimation(
-                                manager.getContext(), item.emoji, item.category, item.description
-                            )
-                        } else {
-                            Emoji3DShareStore.prepare(
-                                manager.getContext(), item.emoji, item.category, item.description
+                        when (mime) {
+                            Emoji3DShareStore.ANIMATED_WEBP_MIME_TYPE ->
+                                Emoji3DShareStore.prepareWebpAnimation(
+                                    manager.getContext(), item.emoji,
+                                    item.category, item.description
+                                )
+                            Emoji3DShareStore.ANIMATED_MIME_TYPE ->
+                                Emoji3DShareStore.prepareAnimation(
+                                    manager.getContext(), item.emoji,
+                                    item.category, item.description
+                                )
+                            else -> Emoji3DShareStore.prepare(
+                                manager.getContext(), item.emoji,
+                                item.category, item.description
                             )
                         }
                     }
