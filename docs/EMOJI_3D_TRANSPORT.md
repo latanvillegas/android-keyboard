@@ -1,70 +1,100 @@
-# Adaptive Fluent Emoji 3D transport
+# Real animated Fluent Emoji 3D: adaptive Android transport
 
-## Contract
+## Behavior and compatibility
 
-The emoji picker continues to display the existing prerendered Fluent 3D
-WebP assets when the relief setting is enabled. No new artwork is generated.
+When the 3D relief setting is enabled, the keyboard continues to display the
+existing Microsoft Fluent prerendered 3D illustrations. Sending a selected
+emoji now follows a **single ordered** path:
 
-Selecting an emoji uses one ordered output path:
+1. Capture the base editor session (InputConnection and EditorInfo identity).
+2. If the editor declares `image/gif`, look up the selected Unicode sequence
+   in the packaged motion index (`assets/emoji3d-motion/index.txt`).
+3. If a genuine Fluent animation exists, stage the original animation as an
+   offline GIF in a private cache, grant the editor a temporary read-only URI
+   and call `InputConnectionCompat.commitContent` with `image/gif`.
+4. If no animation exists, the GIF was rejected, or GIF isn't supported, check
+   `image/png` and stage the same 3D illustration used by the picker.
+5. If neither option can be committed, insert the **original** Unicode
+   sequence exactly once; preserve whitespace handling for ASCII emoticons.
+6. If the editor session changes during asynchronous preparation, insert
+   nothing into the newly focused field.
 
-1. Capture the base editor session (input connection + EditorInfo identity).
-2. When 3D is disabled, or the editor does not advertise `image/png`, insert
-   the original Unicode string (ASCII emoticons retain whitespace handling).
-3. When 3D is enabled and PNG is advertised, resolve the same Fluent asset
-   used by the picker, prepare a transparent PNG in the private cache on
-   Dispatchers.IO and offer a read-only `content://` URI to the editor.
-4. If the artwork does not exist, PNG preparation fails or the editor explicitly
-   rejects `commitContent`, insert the original Unicode string once.
-5. If `commitContent` returns true, do **not** insert any Unicode fallback.
-6. If the editor session changes while preparing the PNG, do not insert
-   anything into the newly focused editor.
+The app may present GIF/PNG content as an attachment, sticker preview, or
+media item rather than an inline text character. `commitContent=true` means
+the editor accepted the request; it is **not** a delivery receipt. The
+receiving app may still require the user to confirm sending media.
 
-Image insertion may appear as an attachment or preview instead of an inline
-text glyph, depending on the receiving application. A true `commitContent`
-return value means the editor accepted the content request; it does **not**
-prove that a message was transmitted or delivered.
+A receiving chat advertising `image/gif` does not guarantee that the other
+party's client will play animated media automatically; this needs empirical
+per-app testing.
 
-## Storage and permissions
+## What "real movement" means
 
-- The provider uses `${applicationId}.emoji3d`, `exported=false` and
-  `grantUriPermissions=true`. The existing `typeUri` path grants
-  `FLAG_GRANT_READ_URI_PERMISSION` to the editor's package.
-- PNGs are addressed by SHA-256 of the resolved asset key, never by a
-  caller-controlled file path. The provider checks URI authority, scheme,
-  path and fixed-length hex identifier.
-- Output creation is atomic (temporary file, then rename), and serialized.
-- Individual PNG output is limited to 8 MiB; the on-demand cache targets
-  64 MiB and expires unused files after 24 hours. Recently shared files are
-  retained for at least ten minutes to allow asynchronous reads.
-- No network requests or external storage access are needed.
+The 30 initially bundled animated variants use **original Microsoft APNG
+animation frames**, not a bounce, wiggle, fake expression or 2D transform of a
+static PNG. They are packaged into looping transparent GIFs offline at build
+time. The source repository has additional animation coverage, but only the
+verified selected catalog is staged to avoid growing the keyboard APK by
+gigabytes.
 
-## Manual Android integration matrix
+These are **prerendered animated 3D illustrations**, not interactive 3D models
+such as GLB meshes. The selected catalog is defined in
+`scripts/build_emoji3d_motion.py`, including the exact upstream source
+paths. Emojis not in the motion index retain their exact Fluent static artwork
+and/or Unicode fallback. Skin-tone variants are never silently substituted
+with the default skin tone.
 
-| Test | Expected behavior |
+## Source and reproducibility
+
+- Source: `microsoft/fluentui-emoji-animated` (MIT)
+- Pinned source commit: `daa0365c09795789ed2bc6e8b228c97736cb6669`
+- The build fetches **only** 30 selected Git LFS files. No full-size
+  multi-GB animation repository is downloaded.
+- `scripts/build_emoji3d_motion.py` converts the actual source APNG frames
+  with Pillow 11.3.0, resizes to 128x128 while preserving alpha, bounds
+  output to 48 GIF frames / 8 MiB per image, preserves the original total
+  timing, verifies multiple distinct frames, and writes a source SHA-256
+  manifest.
+- `assets/emoji3d-motion/LICENSE.txt` includes the official Microsoft MIT
+  license; `SOURCE.json` records provenance and per-animation hashes.
+- Assets are packaged only at build time; the installed keyboard never
+  downloads them.
+
+The existing pinned source for static Fluent 3D (`assets/emoji3d`) remains
+untouched.
+
+## Security, performance and correctness
+
+- Only the non-exported `${applicationId}.emoji3d` provider serves the files,
+  with URI grant permissions to the current editor.
+- Cache filenames are SHA-256 hashes of known asset keys, not user-provided
+  filesystem paths. MIME and URI structure are validated by the provider.
+- Exported files are written atomically and checked against the 8 MiB cap.
+- A 64 MiB target cache evicts old content and expires unused files after
+  24 hours, retaining recently shared media for a minimum of ten minutes.
+- All file preparation runs on Dispatchers.IO. A mutex preserves tap order.
+- Unicode fallback never fires after an accepted GIF/PNG commit, avoiding
+  duplicate messages.
+
+## Device validation matrix
+
+| Scenario | Expected result |
 | --- | --- |
-| 3D on; editor advertises image/png; asset present; commit accepted | One PNG insertion; no Unicode duplicate |
-| 3D on; editor advertises image/png; asset present; commit rejected | One Unicode insertion |
-| 3D on; editor has no image MIME capability | One Unicode insertion |
-| 3D on; Fluent asset missing | One Unicode insertion |
-| 3D off; any editor | Original Unicode/ASCII behavior |
-| Skin-tone or ZWJ variant with artwork | Exact variant exported; never replace with default skin tone |
-| Skin-tone or ZWJ variant without artwork | Exact selected Unicode sequence |
-| Switch app/field while PNG is rendering | No insertion in newly focused editor |
-| Rapid tapping of 20 emojis | Each tap handled once, in queue order |
-| Repeated image selection | Reuse prepared PNG without unbounded duplicate files |
-| Editor opens content URI after returning true | Provider exposes complete, readable image/png |
-| Editor rejects or throws | No uncaught exception, Unicode fallback |
-| Image receiver does not render as inline emoji | May appear as attachment; design remains intact |
+| Animated catalog emoji; GIF supported; commit accepted | One looping GIF, no duplicate Unicode |
+| GIF supported; commit rejected; PNG supported | One static 3D PNG |
+| GIF not supported; PNG supported | One static 3D PNG |
+| Neither MIME supported | One exact Unicode/ASCII insertion |
+| Selected emoji lacks official motion | Existing static 3D or exact Unicode |
+| Skin-tone/ZWJ variant lacks matching source | Exact variant retained in PNG/Unicode, no tone swap |
+| 3D relief disabled | Original Unicode insertion |
+| Switch chats during GIF/PNG preparation | No insertion in the newly focused chat |
+| 20 rapid taps | One ordered output per tap |
+| Receiver accepts GIF as attachment | Animated media may require manual send confirmation |
+| Receiver claims GIF but displays static preview | Client-specific limitation; verify received message playback |
 
-JVM unit tests cover disabled 3D, unsupported editors, stale sessions, ASCII
-fallback and repeated/concurrent Unicode inserts. Full image commit behavior
-must be verified on devices using actual messaging applications; the emulator
-cannot establish compatibility for third-party apps.
+JVM transport tests and the GitHub Actions motion-asset validation workflow
+must pass before merging. Compile and test Stable Release with all 30 generated
+animations and the original 2,980 Fluent static WebP assets present.
 
-## Validation before merging
-
-Run the existing project's Gradle unit-test and Stable Release compilation
-pipeline, including packaging of the pinned Fluent asset source, then perform
-the Android integration matrix on devices. Do not merge based solely on
-`commitContent` returning true or the appearance of an image inside the
-keyboard picker.
+Do not mark compatibility with WhatsApp, Telegram, Signal or another receiver
+as verified without actually sending and receiving sample GIFs on devices.
