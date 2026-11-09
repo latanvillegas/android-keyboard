@@ -22,7 +22,7 @@ import java.security.MessageDigest
  * The provider is non-exported; URI access is granted only to the focused editor.
  */
 internal object Emoji3DShareStore {
-    const val AUTHORITY: String = BuildConfig.APPLICATION_ID + ".emoji3d"
+    val AUTHORITY: String = BuildConfig.APPLICATION_ID + ".emoji3d"
     const val MIME_TYPE: String = "image/png"
 
     private const val DIRECTORY = "emoji3d-shares"
@@ -71,7 +71,7 @@ internal object Emoji3DShareStore {
                             throw IOException("PNG compression failed")
                         }
                     }
-                    if (temporary.length() !in 1..MAX_PNG_BYTES) {
+                    if (temporary.length() !in 1L..MAX_PNG_BYTES) {
                         throw IOException("Emoji PNG exceeds sharing limit")
                     }
                     if (!temporary.renameTo(output)) {
@@ -81,7 +81,7 @@ internal object Emoji3DShareStore {
                     temporary.delete()
                 }
             }
-            if (output.length() !in 1..MAX_PNG_BYTES) {
+            if (output.length() !in 1L..MAX_PNG_BYTES) {
                 output.delete()
                 return null
             }
