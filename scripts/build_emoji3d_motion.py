@@ -85,9 +85,9 @@ def get_frames(source: Path) -> tuple[list[Image.Image], list[int], tuple[int, i
             rgba = image.convert("RGBA")
             rgba.thumbnail((SIZE, SIZE), Image.Resampling.LANCZOS)
             canvas = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-            canvas.alpha_composite(
-                rgba, ((SIZE - rgba.width) // 2, (SIZE - rgba.height) // 2)
-            )
+            # Plain paste preserves the original unassociated RGBA bytes,
+            # including antialiased edge colors and partially transparent pixels.
+            canvas.paste(rgba, ((SIZE - rgba.width) // 2, (SIZE - rgba.height) // 2))
             frames.append(canvas)
             delays.append(duration)
 
@@ -113,8 +113,9 @@ def sample(
 
 def gif_palette(rgba: Image.Image) -> Image.Image:
     """GIF-only RGBA->indexed conversion, reserving index 0 for transparency."""
-    rgb = Image.new("RGB", rgba.size, (0, 0, 0))
-    rgb.paste(rgba, mask=rgba.getchannel("A"))
+    # Preserve straight RGB at the alpha edges. Blending against black
+    # before quantization would introduce dark fringes in transparent GIFs.
+    rgb = rgba.convert("RGB")
     palette_image = rgb.quantize(colors=255, method=Image.Quantize.MEDIANCUT)
     palette = palette_image.getpalette()[: 255 * 3]
     palette.extend([0] * (255 * 3 - len(palette)))
