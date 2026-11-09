@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Package genuine Microsoft Fluent animated APNG frames as offline GIF stickers.
+"""Build full-color, genuine Fluent 3D animations for offline Android sharing.
 
-Source: microsoft/fluentui-emoji-animated, pinned to an immutable commit, MIT.
-This script intentionally uses *the original animation frames*: no motion
-effects are synthesized from static artwork.
-
-Only a curated set is checked out with Git LFS, avoiding the multi-GB source.
+Animated WebP: 256x256 RGBA, lossless, original motion frames and timing.
+Fallback GIF: 256x256, limited palette only where the receiving editor needs it.
+No upscaling of the original artwork, no synthesized motion, and no runtime I/O
+outside local Android assets. Source is a pinned official Microsoft MIT commit.
 """
 from __future__ import annotations
 
@@ -16,15 +15,17 @@ import math
 import shutil
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, features
 
 UPSTREAM_SHA = "daa0365c09795789ed2bc6e8b228c97736cb6669"
-SIZE = 128
-MAX_FRAMES = 48
-MAX_GIF_BYTES = 8 * 1024 * 1024
+SIZE = 256
+MAX_WEBP_FRAMES = 96
+MAX_GIF_FRAMES = 48
+MAX_WEBP_BYTES = 16 * 1024 * 1024
+MAX_GIF_BYTES = 16 * 1024 * 1024
 
-# Unicode key -> official APNG path. These are exact tree paths at UPSTREAM_SHA.
-# Variants not listed here intentionally fall back to exact static Fluent artwork.
+# Unicode key -> exact upstream APNG location at the immutable commit.
+# Unknown variants are never substituted with the wrong animated glyph.
 SOURCES = {
     "1f600": "assets/Grinning face/animated/grinning_face_animated.png",
     "1f603": "assets/Grinning face with big eyes/animated/grinning_face_with_big_eyes_animated.png",
@@ -59,147 +60,221 @@ SOURCES = {
 }
 
 
-def palettize(rgba: Image.Image) -> Image.Image:
-    """Reserve palette index 0 for transparency; preserve per-frame RGB colors."""
-    rgb = Image.new("RGB", rgba.size, (0, 0, 0))
-    rgb.paste(rgba, mask=rgba.getchannel("A"))
-    quantized = rgb.quantize(colors=255, method=Image.Quantize.MEDIANCUT)
-    palette = quantized.getpalette()[: 255 * 3]
-    palette.extend([0] * (255 * 3 - len(palette)))
-    indexed = quantized.tobytes()
-    alpha = rgba.getchannel("A").tobytes()
-    shifted = bytes(
-        (index + 1 if opacity >= 128 else 0)
-        for index, opacity in zip(indexed, alpha)
-    )
-    output = Image.frombytes("P", rgba.size, shifted)
-    output.putpalette([0, 0, 0] + palette)
-    output.info["transparency"] = 0
-    return output
-
-
-def convert_apng(source: Path, destination: Path) -> dict:
+def get_frames(source: Path) -> tuple[list[Image.Image], list[int], tuple[int, int]]:
+    """Decode composited source APNG frames exactly once, preserving their timing."""
     with Image.open(source) as image:
         total = getattr(image, "n_frames", 1)
         first = 1 if image.info.get("default_image", False) else 0
-        usable = total - first
-        if usable < 2:
-            raise ValueError(f"Not a genuine frame animation: {source}")
+        count = total - first
+        if count < 2:
+            raise ValueError(f"Fluent source is not an animation: {source}")
 
-        stride = max(1, math.ceil(usable / MAX_FRAMES))
-        frames = []
-        delays = []
+        source_size = image.size
+        stride = max(1, math.ceil(count / MAX_WEBP_FRAMES))
+        frames: list[Image.Image] = []
+        delays: list[int] = []
+
         for index in range(first, total):
             image.seek(index)
             duration = int(float(image.info.get("duration", 80) or 80))
             duration = max(20, min(500, duration))
-            if (index - first) % stride != 0:
+            if (index - first) % stride:
                 delays[-1] += duration
                 continue
 
             rgba = image.convert("RGBA")
             rgba.thumbnail((SIZE, SIZE), Image.Resampling.LANCZOS)
             canvas = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-            left = (SIZE - rgba.width) // 2
-            top = (SIZE - rgba.height) // 2
-            canvas.alpha_composite(rgba, (left, top))
-            frames.append(palettize(canvas))
+            canvas.alpha_composite(
+                rgba, ((SIZE - rgba.width) // 2, (SIZE - rgba.height) // 2)
+            )
+            frames.append(canvas)
             delays.append(duration)
 
-        if len(frames) < 2:
-            raise ValueError(f"Animated frames collapsed: {source}")
+    if len(frames) < 2:
+        raise ValueError(f"Too few distinct source frames: {source}")
+    return frames, delays, source_size
 
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        frames[0].save(
-            destination,
-            format="GIF",
-            save_all=True,
-            append_images=frames[1:],
-            loop=0,
-            duration=delays,
-            disposal=2,
-            transparency=0,
-            optimize=False,
-        )
 
-    size = destination.stat().st_size
-    if not 1 <= size <= MAX_GIF_BYTES:
-        destination.unlink(missing_ok=True)
-        raise ValueError(f"GIF size {size} exceeds limit for {source}")
+def sample(
+    frames: list[Image.Image], durations: list[int], limit: int
+) -> tuple[list[Image.Image], list[int]]:
+    stride = max(1, math.ceil(len(frames) / limit))
+    sampled: list[Image.Image] = []
+    delays: list[int] = []
+    for index, frame in enumerate(frames):
+        if index % stride:
+            delays[-1] += durations[index]
+        else:
+            sampled.append(frame)
+            delays.append(durations[index])
+    return sampled, delays
 
-    # Verify that the packaged result has multiple distinct frames, rather than
-    # a container with identical still images.
-    with Image.open(destination) as check:
-        if check.format != "GIF" or check.n_frames < 2:
-            raise ValueError(f"GIF lost its animation: {destination}")
-        check.seek(0)
-        first_bytes = check.convert("RGBA").tobytes()
-        distinct = False
-        for i in range(1, check.n_frames):
-            check.seek(i)
-            if check.convert("RGBA").tobytes() != first_bytes:
-                distinct = True
+
+def gif_palette(rgba: Image.Image) -> Image.Image:
+    """GIF-only RGBA->indexed conversion, reserving index 0 for transparency."""
+    rgb = Image.new("RGB", rgba.size, (0, 0, 0))
+    rgb.paste(rgba, mask=rgba.getchannel("A"))
+    palette_image = rgb.quantize(colors=255, method=Image.Quantize.MEDIANCUT)
+    palette = palette_image.getpalette()[: 255 * 3]
+    palette.extend([0] * (255 * 3 - len(palette)))
+    indexes = palette_image.tobytes()
+    alphas = rgba.getchannel("A").tobytes()
+    packed = bytes(
+        (palette_index + 1 if alpha >= 128 else 0)
+        for palette_index, alpha in zip(indexes, alphas)
+    )
+    frame = Image.frombytes("P", rgba.size, packed)
+    frame.putpalette([0, 0, 0] + palette)
+    frame.info["transparency"] = 0
+    return frame
+
+
+def validate(
+    destination: Path, fmt: str, max_bytes: int, expect_transparency: bool
+) -> tuple[int, int]:
+    byte_count = destination.stat().st_size
+    if not 1 <= byte_count <= max_bytes:
+        raise ValueError(f"{destination.name}: {byte_count} bytes is outside limit")
+    with Image.open(destination) as result:
+        if result.format != fmt or getattr(result, "n_frames", 1) < 2:
+            raise ValueError(f"{destination.name}: animation missing or wrong format")
+        if result.size != (SIZE, SIZE):
+            raise ValueError(f"{destination.name}: incorrect frame resolution")
+        result.seek(0)
+        pixels = result.convert("RGBA")
+        first_bytes = pixels.tobytes()
+        has_transparency = pixels.getchannel("A").getextrema()[0] < 255
+        changed = False
+        for index in range(1, result.n_frames):
+            result.seek(index)
+            if result.convert("RGBA").tobytes() != first_bytes:
+                changed = True
                 break
-        if not distinct:
-            raise ValueError(f"Animation contains no visible changes: {source}")
-        output_frames = check.n_frames
+        if not changed:
+            raise ValueError(f"{destination.name}: no genuine moving frames")
+        if expect_transparency and not has_transparency:
+            raise ValueError(f"{destination.name}: alpha channel disappeared")
+        return result.n_frames, byte_count
 
+
+def convert_apng(source: Path, output_webp: Path, output_gif: Path) -> dict:
+    frames, delays, original_size = get_frames(source)
+    output_webp.parent.mkdir(parents=True, exist_ok=True)
+
+    # Lossless animated WebP keeps the full 24-bit RGB + 8-bit alpha channel.
+    # Transparency is preserved; not quantized to the GIF's 256-color palette.
+    frames[0].save(
+        output_webp,
+        format="WEBP",
+        save_all=True,
+        append_images=frames[1:],
+        duration=delays,
+        loop=0,
+        lossless=True,
+        quality=100,
+        method=6,
+        exact=True,
+        minimize_size=True,
+    )
+    webp_frames, webp_bytes = validate(
+        output_webp, "WEBP", MAX_WEBP_BYTES, expect_transparency=True
+    )
+
+    gif_frames, gif_delays = sample(frames, delays, MAX_GIF_FRAMES)
+    indexed = [gif_palette(frame) for frame in gif_frames]
+    indexed[0].save(
+        output_gif,
+        format="GIF",
+        save_all=True,
+        append_images=indexed[1:],
+        duration=gif_delays,
+        loop=0,
+        disposal=2,
+        transparency=0,
+        optimize=False,
+    )
+    gif_count, gif_bytes = validate(
+        output_gif, "GIF", MAX_GIF_BYTES, expect_transparency=True
+    )
     return {
-        "frames": output_frames,
+        "source_dimensions": list(original_size),
+        "size": SIZE,
+        "webp_frames": webp_frames,
+        "webp_bytes": webp_bytes,
+        "gif_frames": gif_count,
+        "gif_bytes": gif_bytes,
         "duration_ms": sum(delays),
         "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
-        "output_bytes": size,
     }
 
 
 def package(source_root: Path, destination: Path) -> int:
+    if not features.check("webp_anim") or not features.check("webp"):
+        raise RuntimeError("Pillow must include libwebp animated encoder support")
+
     license_file = source_root / "LICENSE"
-    if not license_file.is_file() or "MIT License" not in license_file.read_text():
-        raise FileNotFoundError("Official Microsoft animated emoji MIT license missing")
+    if not license_file.is_file() or "MIT License" not in license_file.read_text(
+        encoding="utf-8"
+    ):
+        raise FileNotFoundError("Microsoft's MIT animation license is missing")
+
     destination.mkdir(parents=True, exist_ok=True)
     entries: dict[str, dict] = {}
     for key, relative in SOURCES.items():
-        path = source_root / relative
-        if not path.is_file():
-            raise FileNotFoundError(f"Required pinned Fluent animation missing: {relative}")
-
-        # The upstream source must describe the exact Unicode emoji selected
-        # by the keyboard. FE0E/FE0F are optional presentation selectors.
-        metadata_path = path.parent.parent / "metadata.json"
+        source = source_root / relative
+        if not source.is_file():
+            raise FileNotFoundError(f"Pinned animation not found: {relative}")
+        metadata_path = source.parent.parent / "metadata.json"
         if not metadata_path.is_file():
-            raise FileNotFoundError(f"Fluent source metadata missing: {metadata_path}")
-        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        source_unicode = metadata["unicode"].lower().replace("_", "-").replace(" ", "-")
-        source_unicode = "-".join(
-            part for part in source_unicode.split("-")
-            if part not in {"fe0e", "fe0f"}
-        )
-        if source_unicode != key:
-            raise ValueError(
-                f"Unicode mismatch: {key} mapped to {metadata['unicode']} in {relative}"
-            )
+            raise FileNotFoundError(f"Emoji metadata missing: {metadata_path}")
 
-        output = destination / f"{key}.gif"
-        detail = convert_apng(path, output)
-        entries[key] = {"source": relative, **detail}
-        print(f"{key}: {detail['frames']} genuine frames, {detail['output_bytes']:,} bytes")
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        actual = metadata["unicode"].lower().replace("_", "-").replace(" ", "-")
+        actual = "-".join(
+            value for value in actual.split("-") if value not in {"fe0e", "fe0f"}
+        )
+        if actual != key:
+            raise ValueError(f"Unicode mismatch: {key} maps to {actual} in {relative}")
+
+        info = convert_apng(
+            source, destination / f"{key}.webp", destination / f"{key}.gif"
+        )
+        entries[key] = {"source": relative, **info}
+        print(
+            f"{key}: lossless WebP {info['webp_frames']} frames/"
+            f"{info['webp_bytes']:,} bytes; GIF {info['gif_frames']} frames/"
+            f"{info['gif_bytes']:,} bytes"
+        )
 
     (destination / "index.txt").write_text(
         "\n".join(sorted(entries)) + "\n", encoding="utf-8"
     )
     shutil.copyfile(license_file, destination / "LICENSE.txt")
     (destination / "SOURCE.json").write_text(
-        json.dumps({
-            "origin": "microsoft/fluentui-emoji-animated",
-            "commit": UPSTREAM_SHA,
-            "license": "MIT, Copyright (c) Microsoft Corporation",
-            "note": "Original frame-by-frame Fluent 3D animation, optimized to offline GIF",
-            "count": len(entries),
-            "assets": entries,
-        }, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8"
+        json.dumps(
+            {
+                "origin": "microsoft/fluentui-emoji-animated",
+                "commit": UPSTREAM_SHA,
+                "license": "MIT, copyright Microsoft Corporation",
+                "format": "Animated WebP lossless RGBA + compatibility GIF",
+                "maximum_side_pixels": SIZE,
+                "count": len(entries),
+                "assets": entries,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
     )
-    print(f"Packaged {len(entries)} genuine animated Fluent emojis.")
+    webp_bytes = sum(x["webp_bytes"] for x in entries.values())
+    gif_bytes = sum(x["gif_bytes"] for x in entries.values())
+    print(
+        f"Verified {len(entries)} original animated Fluent emojis: "
+        f"WebP={webp_bytes / 1048576:.1f} MiB, "
+        f"GIF={gif_bytes / 1048576:.1f} MiB."
+    )
     return len(entries)
 
 
