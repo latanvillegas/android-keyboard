@@ -113,6 +113,19 @@ private fun MediaHubPanel(manager: KeyboardManagerForAction) {
                 Text(stringResource(R.string.media_export))
             }
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(onClick = {
+                context.startActivity(
+                    Intent(context, GifEditorActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }) {
+                Text(stringResource(R.string.gif_editor_title))
+            }
+            TextButton(onClick = { manager.activateAction(OfflineAiAction) }) {
+                Text(stringResource(R.string.local_ai_title))
+            }
+        }
         TextButton(onClick = {
             SettingsActivity.openToNavDest(context, "models")
         }) {
@@ -190,6 +203,13 @@ private fun MediaHubPanel(manager: KeyboardManagerForAction) {
                             manager.getLifecycleScope().launch {
                                 MediaLibrary.delete(context, item.id)
                             }
+                        },
+                        onEdit = {
+                            context.startActivity(
+                                Intent(context, GifEditorActivity::class.java)
+                                    .putExtra("media_id", item.id)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
                         }
                     )
                 }
@@ -203,7 +223,8 @@ private fun MediaTile(
     item: MediaItem,
     onSend: () -> Unit,
     onFavorite: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEdit: () -> Unit
 ) {
     val context = LocalContext.current
     val bitmap by produceState<android.graphics.Bitmap?>(null, item.id) {
@@ -227,6 +248,11 @@ private fun MediaTile(
             }
         }
         Text(item.displayName, maxLines = 1)
+        if (item.kind == MediaKind.GIF) {
+            TextButton(onClick = onEdit) {
+                Text(stringResource(R.string.gif_editor_edit))
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onFavorite) {
                 Text(if (item.favorite) "★" else "☆")

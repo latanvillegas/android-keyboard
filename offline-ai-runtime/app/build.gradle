@@ -1,0 +1,36 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+android {
+    namespace 'org.futo.inputmethod.localai'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'org.futo.inputmethod.localai'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0'
+    }
+    signingConfigs {
+        debug {
+            // Signature IPC only works when both packages use the same cert.
+            storeFile file('../../java/shared.keystore')
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+}
+dependencies {
+    // Native inference and model weights NEVER ship in the keyboard APK.
+    implementation 'com.google.mediapipe:tasks-genai:0.10.27'
+}

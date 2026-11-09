@@ -23,6 +23,8 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.WRITE_USER_DICTIONARY"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Runtime is a separate, equally signed, offline-only APK. -->
+    <uses-permission android:name="org.futo.inputmethod.latin.permission.LOCAL_AI"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
@@ -34,6 +36,10 @@
         android:minSdkVersion="33" />
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove"/>
+
+    <queries>
+        <package android:name="org.futo.inputmethod.localai" />
+    </queries>
 
     <application android:label="@string/english_ime_name"
          android:icon="@mipmap/ic_launcher"
@@ -110,6 +116,12 @@
         <activity
             android:name=".uix.actions.media.MediaExportActivity"
             android:label="@string/media_export"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+
+        <activity
+            android:name=".uix.actions.media.GifEditorActivity"
+            android:label="@string/gif_editor_title"
             android:exported="false"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
 

@@ -2,11 +2,9 @@ name: Build FUTO lossless 3D RGBA animated emoji preview APK
 
 on:
   pull_request:
-    # Suppress costly runs while the stacked Media Hub branch is under construction.
-    branches-ignore:
-      - feature/media-hub-stickers-gif-offline-ai
     paths:
       - "java/**"
+      - "offline-ai-runtime/**"
       - "scripts/build_emoji3d_motion.py"
       - "scripts/build_emoji3d_assets.py"
       - "tests/unit/**"
@@ -26,7 +24,7 @@ permissions:
 jobs:
   static-assets:
     name: Produce/cache 256px lossless RGBA static artwork
-    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.lite) || (github.event_name == 'pull_request' && github.head_ref != 'feature/fluent3d-optional-hq-pack-lite-apk') }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.lite) || (github.event_name == 'pull_request' && github.head_ref == 'feature/fluent3d-optional-hq-pack-lite-apk' && contains(github.event.pull_request.title, '[ci-final]')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -86,7 +84,7 @@ jobs:
 
   motion-assets:
     name: Produce/cache 30 genuine 256px lossless animations
-    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.lite) || (github.event_name == 'pull_request' && github.head_ref != 'feature/fluent3d-optional-hq-pack-lite-apk') }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.lite) || (github.event_name == 'pull_request' && github.head_ref == 'feature/fluent3d-optional-hq-pack-lite-apk' && contains(github.event.pull_request.title, '[ci-final]')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 110
     steps:
@@ -332,8 +330,8 @@ jobs:
           retention-days: 30
 
   lite-preview:
-    # No Actions consumed by routine changes in this WIP branch.
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.lite }}
+    # This is a one-time explicit PR final integration CI gate.
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.lite) || (github.event_name == 'pull_request' && github.head_ref == 'feature/fluent3d-optional-hq-pack-lite-apk' && contains(github.event.pull_request.title, '[ci-final]')) }}
     name: Build signed small APK + original quality offline media package
     needs: [static-assets, motion-assets]
     runs-on: ubuntu-24.04
@@ -440,6 +438,29 @@ jobs:
           ./gradlew --no-daemon --build-cache --stacktrace \
             --warning-mode summary testStableReleaseUnitTest assembleStableRelease
 
+      - name: Build OPTIONAL signed no-network local AI runtime APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon --build-cache --stacktrace --warning-mode summary \
+            -p offline-ai-runtime :app:assembleRelease
+          runtime="$(find offline-ai-runtime/app/build/outputs/apk/release \
+            -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          test -s "$runtime"
+          cp "$runtime" lite-dist/futo-local-ai-runtime.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose \
+            lite-dist/futo-local-ai-runtime.apk \
+            > lite-dist/local-ai-runtime-signature.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions \
+            lite-dist/futo-local-ai-runtime.apk \
+            > lite-dist/local-ai-runtime-permissions.txt
+          if grep -q 'android.permission.INTERNET' \
+            lite-dist/local-ai-runtime-permissions.txt; then
+            echo "::error::Optional local AI APK must not request INTERNET"
+            exit 1
+          fi
+
       - name: Verify APK contains no Fluent files and external pack preserves all media
         shell: bash
         run: |
@@ -516,12 +537,24 @@ jobs:
                     f"{len(sharing)} lossless RGBA masters, "
                     f"{len(motion)} Animated WebP and GIF pairs; all SHA256 passed")
           PY
+          keyboard_cert="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify \
+            --print-certs lite-dist/futo-keyboard-media-hub-lite.apk \
+            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          runtime_cert="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify \
+            --print-certs lite-dist/futo-local-ai-runtime.apk \
+            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          test -n "$keyboard_cert"
+          test "$keyboard_cert" = "$runtime_cert"
+          echo "The keyboard and optional AI companion use the same signing cert"
           (cd lite-dist && sha256sum \
             futo-keyboard-media-hub-lite.apk \
+            futo-local-ai-runtime.apk \
             fluent3d-full-offline-collection.zip) > lite-dist/SHA256SUMS
           printf '%s\n' \
             "Source commit: $GITHUB_SHA" \
             "Keyboard: zero bundled Fluent 3D catalogs; Unicode fallback available" \
+            "Optional offline inference: separate signed APK and manually imported model" \
+            "Optional AI companion network permission: none" \
             "Original 128px, 256px RGBA, animated WebP and GIF: optional offline ZIP" \
             "Signing: DEVELOPMENT/test key; not an upgrade to production builds" \
             "Run: $GITHUB_RUN_ID" \

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <permission
+        android:name="org.futo.inputmethod.latin.permission.LOCAL_AI"
+        android:protectionLevel="signature" />
+    <!-- Remove any transitive INTERNET request from the inference SDK. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <!-- No Internet or network permission; all inference is local. -->
+    <application
+        android:label="FUTO Local AI Runtime"
+        android:allowBackup="false"
+        android:supportsRtl="true">
+        <service
+            android:name=".LocalAiService"
+            android:exported="true"
+            android:permission="org.futo.inputmethod.latin.permission.LOCAL_AI" />
+        <activity
+            android:name=".ModelSetupActivity"
+            android:exported="true"
+            android:permission="org.futo.inputmethod.latin.permission.LOCAL_AI" />
+    </application>
+</manifest>
