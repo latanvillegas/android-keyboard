@@ -60,8 +60,19 @@ interface KeyboardManagerForAction {
 
     fun typeText(v: String)
     fun typeTextSurroundedByWhitespace(v: String)
-    fun typeUri(uri: Uri, mimeTypes: List<String>, ignoreConnectionOverride: Boolean = false): Boolean
+    fun typeUri(
+        uri: Uri,
+        mimeTypes: List<String>,
+        ignoreConnectionOverride: Boolean = false,
+        showUnsupportedMessage: Boolean = true
+    ): Boolean
     fun appSupportsImageInsertion(schema: String, ignoreConnectionOverride: Boolean): Boolean
+
+    /** Opaque identity of the focused editor. Capture before asynchronous media preparation. */
+    fun captureEditorSession(): Any?
+
+    /** Never insert into a different editor after a focus or session change. */
+    fun isEditorSessionCurrent(token: Any?): Boolean
     fun backspace(amount: Int)
 
     fun closeActionWindow()

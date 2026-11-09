@@ -126,6 +126,14 @@ object FluentEmoji3D {
         null
     }
 
+    /** Resolves the exact bundled artwork also used by the on-screen selector. */
+    fun assetKey(
+        context: Context,
+        value: String,
+        category: String? = null,
+        description: String? = null
+    ): String? = resolve(context.applicationContext, value, category, description)
+
     /** Intended for Dispatchers.IO; never call this on the UI thread. */
     fun loadBitmap(
         context: Context,

@@ -118,6 +118,7 @@ import org.futo.inputmethod.latin.uix.SettingsKey
 import org.futo.inputmethod.latin.uix.actions.emoji.EmojiItem
 import org.futo.inputmethod.latin.uix.actions.emoji.EmojiView
 import org.futo.inputmethod.latin.uix.actions.emoji.FluentEmoji3DImage
+import org.futo.inputmethod.latin.uix.actions.emoji.SmartEmojiTransport
 import org.futo.inputmethod.latin.uix.settings.useDataStore
 import org.futo.inputmethod.latin.uix.settings.useDataStoreValue
 import org.futo.inputmethod.latin.uix.theme.LocalCompatEmojiFamily
@@ -1206,15 +1207,22 @@ val EmojiAction = Action(
             @Composable
             override fun WindowContents(keyboardShown: Boolean) {
                 val view = LocalView.current
+                val raisedEmojiStyle = useDataStoreValue(EmojiReliefSetting)
                 PersistentEmojiState.emojis.value?.let { emojis ->
-                    EmojiGrid(onClick = {
-                        if(it.category == "ASCII") {
-                            manager.typeTextSurroundedByWhitespace(it.emoji)
-                        } else {
-                            manager.typeText(it.emoji)
-                        }
+                    EmojiGrid(onClick = { item ->
+                        // A single ordered transport path handles 3D media and Unicode fallback.
+                        // Session identity is captured before any background image preparation.
+                        val editorToken = manager.captureEditorSession()
                         manager.getLifecycleScope().launch {
-                            manager.getContext().useEmoji(it.emoji)
+                            val result = SmartEmojiTransport.send(
+                                manager = manager,
+                                item = item,
+                                useThreeD = raisedEmojiStyle,
+                                editorToken = editorToken
+                            )
+                            if (result != SmartEmojiTransport.Result.EDITOR_CHANGED) {
+                                manager.getContext().useEmoji(item.emoji)
+                            }
                         }
                         manager.performHapticAndAudioFeedback(Constants.CODE_EMOJI, view)
                     }, onExit = {

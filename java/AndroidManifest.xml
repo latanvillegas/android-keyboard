@@ -219,6 +219,12 @@
             android:name=".uix.actions.clipboard.ClipboardProvider"
             android:exported="false"
             android:grantUriPermissions="true" />
+
+        <provider
+            android:authorities="${applicationId}.emoji3d"
+            android:name=".uix.actions.emoji.Emoji3DContentProvider"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 
     <!-- To query enabled input methods for voice IME detection -->
