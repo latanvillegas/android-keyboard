@@ -54,3 +54,20 @@ from `microsoft/fluentui-emoji-animated`, which is MIT-licensed by Microsoft.
 Not every Fluent emoji has an animation in the APK. Unsupported or missing
 motion content is never replaced by a mismatched emoji or a fake motion effect;
 the existing static 3D illustration and Unicode fallback remain available.
+
+
+## High-fidelity 3D distribution
+
+The animation assets described above are now distributed in **two formats**
+for each selected Unicode sequence: full-color, lossless **256px Animated
+WebP RGBA** (original Microsoft motion; up to 96 frames), and **256px GIF**
+for legacy chat support (limited to 256 palette colors per GIF frame).
+
+Static 3D illustrations are built into two distinct variants from the same
+licensed source: the compact 128px picker preview and a lossless 256px
+sharing master used to generate PNG inserts. The MIT licenses and source
+manifests are included under `assets/emoji3d/`,
+`assets/emoji3d-share/` and `assets/emoji3d-motion/`.
+
+This enhancement preserves the original source illustration and does not
+introduce non-Microsoft source artwork or synthesize facial motion.
