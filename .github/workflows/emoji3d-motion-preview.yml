@@ -1,0 +1,147 @@
+name: Build FUTO 3D animated emoji preview APK
+
+on:
+  pull_request:
+    paths:
+      - "java/**"
+      - "scripts/build_emoji3d_motion.py"
+      - "scripts/build_emoji3d_assets.py"
+      - "tests/unit/**"
+      - ".github/workflows/emoji3d-motion-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  animated-preview:
+    name: Build and verify development-signed Stable Release preview
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          lfs: false
+
+      - name: Fetch pinned project submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule sync --recursive
+          git -c protocol.version=2 submodule update --init --depth 1 --jobs 4 -- \
+            libs translations java/assets/layouts java/assets/themes java/res-large \
+            voiceinput-shared/src/main/ml
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install SDK, NDK and CMake
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install \
+            "platforms;android-35" "build-tools;35.0.0" \
+            "ndk;28.2.13676358" "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Stage all original static Fluent 3D illustrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check Pillow==11.3.0
+          STATIC_COMMIT=7a40f1a2d064d76e436813edc0f09b6c8cde5da8
+          STATIC_DIR="$RUNNER_TEMP/fluentui-emoji-unicode"
+          mkdir -p "$STATIC_DIR"
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 900 \
+            "https://codeload.github.com/shuding/fluentui-emoji-unicode/tar.gz/$STATIC_COMMIT" \
+            -o "$RUNNER_TEMP/fluent-3d-static.tar.gz"
+          tar xzf "$RUNNER_TEMP/fluent-3d-static.tar.gz" -C "$STATIC_DIR" \
+            --strip-components=1
+          python scripts/build_emoji3d_assets.py --source "$STATIC_DIR/assets" \
+            --dest java/assets/emoji3d --commit "$STATIC_COMMIT"
+
+      - name: Stage genuine animated Fluent 3D GIFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git lfs version
+          MOTION_SHA=daa0365c09795789ed2bc6e8b228c97736cb6669
+          MOTION_DIR="$RUNNER_TEMP/fluentui-emoji-animated"
+          GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 --filter=blob:none --no-checkout \
+            https://github.com/microsoft/fluentui-emoji-animated.git "$MOTION_DIR"
+          (
+            cd "$MOTION_DIR"
+            git -c protocol.version=2 fetch --depth 1 origin "$MOTION_SHA"
+            GIT_LFS_SKIP_SMUDGE=1 git checkout --detach "$MOTION_SHA"
+            git lfs pull --include="$(python "$GITHUB_WORKSPACE/scripts/build_emoji3d_motion.py" --list-source-paths)" --exclude=""
+          )
+          python scripts/build_emoji3d_motion.py \
+            --source "$MOTION_DIR" --dest java/assets/emoji3d-motion
+          test "$(wc -l < java/assets/emoji3d-motion/index.txt)" -eq 30
+          test "$(wc -l < java/assets/emoji3d/index.txt)" -ge 2500
+
+      - name: Run regressions and assemble complete preview APK
+        shell: bash
+        env:
+          VERSION_NAME: emoji3d-motion-preview
+          VERSION_CODE: "900002"
+          BRANCH_NAME: master
+        run: |
+          set -euo pipefail
+          test -f java/shared.keystore
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace --warning-mode summary \
+            testStableReleaseUnitTest assembleStableRelease
+
+      - name: Verify animation contents, APK and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p preview-dist
+          apk="$(find build/outputs/apk/stable/release -maxdepth 1 \
+            -type f -name '*.apk' | head -n 1)"
+          test -n "$apk" && test -s "$apk"
+          cp "$apk" preview-dist/futo-keyboard-fluent-3d-animated-preview.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose \
+            preview-dist/futo-keyboard-fluent-3d-animated-preview.apk \
+            > preview-dist/signature-verification.txt
+          unzip -t preview-dist/futo-keyboard-fluent-3d-animated-preview.apk \
+            > preview-dist/zip-integrity.txt
+          static_count="$(unzip -p preview-dist/futo-keyboard-fluent-3d-animated-preview.apk \
+            assets/emoji3d/index.txt | wc -l)"
+          motion_count="$(unzip -p preview-dist/futo-keyboard-fluent-3d-animated-preview.apk \
+            assets/emoji3d-motion/index.txt | wc -l)"
+          test "$static_count" -ge 2500
+          test "$motion_count" -eq 30
+          unzip -p preview-dist/futo-keyboard-fluent-3d-animated-preview.apk \
+            assets/emoji3d-motion/LICENSE.txt > preview-dist/FLUENT_ANIMATED_MIT_LICENSE.txt
+          (cd preview-dist && sha256sum futo-keyboard-fluent-3d-animated-preview.apk) \
+            > preview-dist/SHA256SUMS
+          printf '%s\n' \
+            "Source commit: $GITHUB_SHA" \
+            "Static 3D assets: $static_count" \
+            "Genuine animated 3D assets: $motion_count" \
+            "Signing: DEVELOPMENT key (not a production update)" \
+            "GitHub Actions run: $GITHUB_RUN_ID" \
+            > preview-dist/BUILD-INFO.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: futo-keyboard-fluent-3d-motion-preview
+          path: preview-dist/
+          if-no-files-found: error
+          retention-days: 30
