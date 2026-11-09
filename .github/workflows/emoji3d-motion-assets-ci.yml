@@ -1,0 +1,72 @@
+name: Verify genuine Fluent animated assets
+
+on:
+  pull_request:
+    paths:
+      - "scripts/build_emoji3d_motion.py"
+      - ".github/workflows/emoji3d-motion-assets-ci.yml"
+      - ".github/workflows/android-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fluent-animation:
+    name: Verify original animation frames and generated GIFs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+          lfs: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pinned animation converter
+        run: python -m pip install --disable-pip-version-check Pillow==11.3.0
+
+      - name: Fetch only the selected MIT-licensed original Microsoft animations
+        shell: bash
+        run: |
+          set -euo pipefail
+          git lfs version
+          MOTION_SHA=daa0365c09795789ed2bc6e8b228c97736cb6669
+          MOTION_DIR="$RUNNER_TEMP/fluentui-emoji-animated"
+          GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 --filter=blob:none --no-checkout \
+            https://github.com/microsoft/fluentui-emoji-animated.git "$MOTION_DIR"
+          (
+            cd "$MOTION_DIR"
+            git -c protocol.version=2 fetch --depth 1 origin "$MOTION_SHA"
+            GIT_LFS_SKIP_SMUDGE=1 git checkout --detach "$MOTION_SHA"
+            git lfs pull --include="$(python "$GITHUB_WORKSPACE/scripts/build_emoji3d_motion.py" --list-source-paths)" --exclude=""
+          )
+          python scripts/build_emoji3d_motion.py \
+            --source "$MOTION_DIR" \
+            --dest "$RUNNER_TEMP/emoji3d-motion"
+
+      - name: Inspect GIF animation and license
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$RUNNER_TEMP/emoji3d-motion/LICENSE.txt"
+          test -s "$RUNNER_TEMP/emoji3d-motion/SOURCE.json"
+          test "$(wc -l < "$RUNNER_TEMP/emoji3d-motion/index.txt")" -eq 30
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from PIL import Image
+          root = Path(os.environ["RUNNER_TEMP"]) / "emoji3d-motion"
+          metadata = json.loads((root / "SOURCE.json").read_text())
+          assert metadata["count"] == 30
+          for key in metadata["assets"]:
+              file = root / (key + ".gif")
+              with Image.open(file) as image:
+                  assert image.format == "GIF"
+                  assert image.n_frames >= 2
+          print("Verified 30 genuine frame-by-frame animated GIFs")
+          PY
