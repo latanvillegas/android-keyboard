@@ -291,7 +291,7 @@ jobs:
             exit 1
           fi
           unzip -p release-dist/futo-keyboard-stable-release.apk \
-            assets/emoji3d-motion/1f600.webp | head -c 12 | \
+            assets/emoji3d-motion/1f600.webp | \
             python3 -c 'import sys; h=sys.stdin.buffer.read(); assert h[:4]==b"RIFF" and h[8:12]==b"WEBP"'
           unzip -p release-dist/futo-keyboard-stable-release.apk \
             assets/emoji3d-motion/LICENSE.txt > release-dist/FLUENT_EMOJI_ANIMATED_LICENSE.txt
