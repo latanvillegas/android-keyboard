@@ -101,6 +101,24 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".uix.actions.media.MediaImportActivity"
+            android:label="@string/media_import"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+
+        <activity
+            android:name=".uix.actions.media.MediaExportActivity"
+            android:label="@string/media_export"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+
+        <activity
+            android:name=".uix.actions.media.StickerEditorActivity"
+            android:label="@string/media_editor_title"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+
         <activity android:name=".uix.ImportResourceActivity"
             android:label="@string/language_settings_import_dictionary_or_model"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
@@ -217,6 +235,12 @@
         <provider
             android:authorities="${applicationId}.clipboard"
             android:name=".uix.actions.clipboard.ClipboardProvider"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
+        <provider
+            android:name=".uix.actions.media.MediaShareProvider"
+            android:authorities="${applicationId}.user-media"
             android:exported="false"
             android:grantUriPermissions="true" />
 

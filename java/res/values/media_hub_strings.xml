@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="media_hub_title">Media Hub</string>
+    <string name="media_import">Import</string>
+    <string name="media_create">Create sticker</string>
+    <string name="media_export">Export ZIP</string>
+    <string name="media_export_success">Exported %1$d media files without quality loss</string>
+    <string name="media_export_failure">Cannot export media ZIP</string>
+    <string name="media_export_in_progress">Exporting your offline media pack…</string>
+    <string name="media_offline_models">Offline AI models</string>
+    <string name="media_all">All</string>
+    <string name="media_gifs">GIF</string>
+    <string name="media_stickers">Stickers</string>
+    <string name="media_favorites">Saved</string>
+    <string name="media_empty">Import GIFs, WebP, PNG, JPEG or a ZIP image pack to get started.</string>
+    <string name="media_unsupported">This app cannot receive this media format.</string>
+    <string name="media_missing">The imported media is unavailable.</string>
+    <string name="media_import_success">Imported %1$d items</string>
+    <string name="media_import_partial">Imported %1$d items; %2$d files failed</string>
+    <string name="media_import_empty">No supported media found</string>
+    <string name="media_import_in_progress">Importing files into the offline media library…</string>
+    <string name="media_editor_title">Create offline sticker</string>
+    <string name="media_choose_photo">Choose picture</string>
+    <string name="media_editor_caption">Sticker text</string>
+    <string name="media_save_sticker">Save transparent PNG sticker</string>
+    <string name="media_sticker_saved">Sticker saved in Media Hub</string>
+</resources>
