@@ -162,6 +162,23 @@ def package(source_root: Path, destination: Path) -> int:
         path = source_root / relative
         if not path.is_file():
             raise FileNotFoundError(f"Required pinned Fluent animation missing: {relative}")
+
+        # The upstream source must describe the exact Unicode emoji selected
+        # by the keyboard. FE0E/FE0F are optional presentation selectors.
+        metadata_path = path.parent.parent / "metadata.json"
+        if not metadata_path.is_file():
+            raise FileNotFoundError(f"Fluent source metadata missing: {metadata_path}")
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        source_unicode = metadata["unicode"].lower().replace("_", "-").replace(" ", "-")
+        source_unicode = "-".join(
+            part for part in source_unicode.split("-")
+            if part not in {"fe0e", "fe0f"}
+        )
+        if source_unicode != key:
+            raise ValueError(
+                f"Unicode mismatch: {key} mapped to {metadata['unicode']} in {relative}"
+            )
+
         output = destination / f"{key}.gif"
         detail = convert_apng(path, output)
         entries[key] = {"source": relative, **detail}
