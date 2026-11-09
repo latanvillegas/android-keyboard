@@ -1,4 +1,4 @@
-name: Verify genuine Fluent animated assets
+name: Verify lossless Fluent RGBA animated assets
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   fluent-animation:
-    name: Verify original animation frames and generated GIFs
+    name: Verify source animation frames, lossless WebP and GIF fallback
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -49,7 +49,7 @@ jobs:
             --source "$MOTION_DIR" \
             --dest "$RUNNER_TEMP/emoji3d-motion"
 
-      - name: Inspect GIF animation and license
+      - name: Verify actual RGBA animation, resolution and compatible GIF
         shell: bash
         run: |
           set -euo pipefail
@@ -61,12 +61,26 @@ jobs:
           from pathlib import Path
           from PIL import Image
           root = Path(os.environ["RUNNER_TEMP"]) / "emoji3d-motion"
-          metadata = json.loads((root / "SOURCE.json").read_text())
-          assert metadata["count"] == 30
-          for key in metadata["assets"]:
-              file = root / (key + ".gif")
-              with Image.open(file) as image:
-                  assert image.format == "GIF"
-                  assert image.n_frames >= 2
-          print("Verified 30 genuine frame-by-frame animated GIFs")
+          manifest = json.loads((root / "SOURCE.json").read_text())
+          assert manifest["count"] == 30
+          assert len(manifest["assets"]) == 30
+          webp_total = gif_total = 0
+          for key, info in manifest["assets"].items():
+              assert info["size"] == 256, key
+              for extension in ("webp", "gif"):
+                  path = root / (key + "." + extension)
+                  with Image.open(path) as image:
+                      assert image.format == extension.upper(), path
+                      assert image.size == (256, 256), path
+                      assert image.n_frames >= 2, path
+                      image.seek(0)
+                      assert image.convert("RGBA").getchannel("A").getextrema()[0] < 255, path
+                  if extension == "webp":
+                      assert info["webp_frames"] >= info["gif_frames"]
+                      webp_total += path.stat().st_size
+                  else:
+                      gif_total += path.stat().st_size
+          print(f"Validated 30 true animated RGBA 256px WebP files "
+                f"({webp_total / 1048576:.1f} MiB) and 30 GIF fallbacks "
+                f"({gif_total / 1048576:.1f} MiB)")
           PY
