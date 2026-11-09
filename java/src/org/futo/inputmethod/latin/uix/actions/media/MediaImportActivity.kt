@@ -27,7 +27,7 @@ class MediaImportActivity : ComponentActivity() {
                 for (uri in files.take(100)) {
                     try {
                         imported += if (MediaPackImporter.hasZipSignature(this@MediaImportActivity, uri)) {
-                            MediaPackImporter.import(this@MediaImportActivity, uri)
+                            MediaPackImporter.importPack(this@MediaImportActivity, uri)
                         } else {
                             MediaLibrary.importUri(this@MediaImportActivity, uri)
                             1
