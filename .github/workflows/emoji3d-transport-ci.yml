@@ -1,0 +1,71 @@
+name: Verify adaptive Fluent 3D emoji transport
+
+on:
+  pull_request:
+    paths:
+      - "java/**"
+      - "tests/unit/**"
+      - ".github/workflows/emoji3d-transport-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: Compile keyboard and run JVM regression tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          lfs: false
+
+      - name: Initialize pinned submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule sync --recursive
+          git -c protocol.version=2 submodule update --init --depth 1 --jobs 4 -- \
+            libs \
+            translations \
+            java/assets/layouts \
+            java/assets/themes \
+            java/res-large \
+            voiceinput-shared/src/main/ml
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK and NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run unit regression suite and compile source
+        shell: bash
+        env:
+          VERSION_NAME: emoji3d-ci
+          VERSION_CODE: "900001"
+          BRANCH_NAME: master
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace --warning-mode summary \
+            testStableReleaseUnitTest
