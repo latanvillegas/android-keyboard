@@ -9,6 +9,8 @@ outside local Android assets. Source is a pinned official Microsoft MIT commit.
 from __future__ import annotations
 
 import argparse
+import os
+from concurrent.futures import ProcessPoolExecutor
 import hashlib
 import json
 import math
@@ -23,6 +25,7 @@ MAX_WEBP_FRAMES = 96
 MAX_GIF_FRAMES = 48
 MAX_WEBP_BYTES = 16 * 1024 * 1024
 MAX_GIF_BYTES = 16 * 1024 * 1024
+DEFAULT_WORKERS = min(3, os.cpu_count() or 1)
 
 # Unicode key -> exact upstream APNG location at the immutable commit.
 # Unknown variants are never substituted with the wrong animated glyph.
@@ -173,10 +176,10 @@ def convert_apng(source: Path, output_webp: Path, output_gif: Path) -> dict:
         duration=delays,
         loop=0,
         lossless=True,
-        quality=100,
-        method=6,
+        quality=80,
+        method=4,
         exact=True,
-        minimize_size=True,
+        minimize_size=False,
     )
     webp_frames, webp_bytes = validate(
         output_webp, "WEBP", MAX_WEBP_BYTES, expect_transparency=True
@@ -210,7 +213,33 @@ def convert_apng(source: Path, output_webp: Path, output_gif: Path) -> dict:
     }
 
 
-def package(source_root: Path, destination: Path) -> int:
+def convert_verified(
+    task: tuple[str, str, Path, Path]
+) -> tuple[str, dict]:
+    """Each original APNG is independent: verify Unicode and render in parallel."""
+    key, relative, source_root, destination = task
+    source = source_root / relative
+    if not source.is_file():
+        raise FileNotFoundError(f"Pinned animation not found: {relative}")
+    metadata_path = source.parent.parent / "metadata.json"
+    if not metadata_path.is_file():
+        raise FileNotFoundError(f"Emoji metadata missing: {metadata_path}")
+
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    actual = metadata["unicode"].lower().replace("_", "-").replace(" ", "-")
+    actual = "-".join(
+        value for value in actual.split("-") if value not in {"fe0e", "fe0f"}
+    )
+    if actual != key:
+        raise ValueError(f"Unicode mismatch: {key} maps to {actual} in {relative}")
+
+    info = convert_apng(
+        source, destination / f"{key}.webp", destination / f"{key}.gif"
+    )
+    return key, {"source": relative, **info}
+
+
+def package(source_root: Path, destination: Path, jobs: int = DEFAULT_WORKERS) -> int:
     if not features.check("webp"):
         raise RuntimeError("Pillow must include the libwebp encoder")
 
@@ -221,32 +250,30 @@ def package(source_root: Path, destination: Path) -> int:
         raise FileNotFoundError("Microsoft's MIT animation license is missing")
 
     destination.mkdir(parents=True, exist_ok=True)
+    if jobs < 1 or jobs > 6:
+        raise ValueError("Worker count must be between 1 and 6")
     entries: dict[str, dict] = {}
-    for key, relative in SOURCES.items():
-        source = source_root / relative
-        if not source.is_file():
-            raise FileNotFoundError(f"Pinned animation not found: {relative}")
-        metadata_path = source.parent.parent / "metadata.json"
-        if not metadata_path.is_file():
-            raise FileNotFoundError(f"Emoji metadata missing: {metadata_path}")
+    tasks = (
+        (key, relative, source_root, destination)
+        for key, relative in SOURCES.items()
+    )
 
-        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        actual = metadata["unicode"].lower().replace("_", "-").replace(" ", "-")
-        actual = "-".join(
-            value for value in actual.split("-") if value not in {"fe0e", "fe0f"}
-        )
-        if actual != key:
-            raise ValueError(f"Unicode mismatch: {key} maps to {actual} in {relative}")
-
-        info = convert_apng(
-            source, destination / f"{key}.webp", destination / f"{key}.gif"
-        )
-        entries[key] = {"source": relative, **info}
+    def record(key: str, info: dict) -> None:
+        entries[key] = info
         print(
-            f"{key}: lossless WebP {info['webp_frames']} frames/"
-            f"{info['webp_bytes']:,} bytes; GIF {info['gif_frames']} frames/"
-            f"{info['gif_bytes']:,} bytes"
+            f"{len(entries)}/{len(SOURCES)}: {key} lossless WebP "
+            f"{info['webp_frames']} frames / {info['webp_bytes']:,} bytes; "
+            f"GIF {info['gif_frames']} frames / {info['gif_bytes']:,} bytes",
+            flush=True,
         )
+
+    if jobs == 1:
+        for key, info in map(convert_verified, tasks):
+            record(key, info)
+    else:
+        with ProcessPoolExecutor(max_workers=jobs) as pool:
+            for key, info in pool.map(convert_verified, tasks):
+                record(key, info)
 
     (destination / "index.txt").write_text(
         "\n".join(sorted(entries)) + "\n", encoding="utf-8"
@@ -284,13 +311,14 @@ def main() -> None:
     parser.add_argument("--source", type=Path)
     parser.add_argument("--dest", type=Path)
     parser.add_argument("--list-source-paths", action="store_true")
+    parser.add_argument("--jobs", type=int, default=DEFAULT_WORKERS)
     args = parser.parse_args()
     if args.list_source_paths:
         print(",".join(SOURCES.values()))
         return
     if args.source is None or args.dest is None:
         parser.error("--source and --dest are required unless --list-source-paths is used")
-    package(args.source, args.dest)
+    package(args.source, args.dest, jobs=args.jobs)
 
 
 if __name__ == "__main__":
