@@ -266,6 +266,11 @@ fun BoxScope.KeyboardBackground(
     }
 }
 
+private class KeyboardEditorSessionToken(
+    val connection: InputConnection,
+    val info: EditorInfo
+)
+
 class UixActionKeyboardManager(val uixManager: UixManager, val latinIME: LatinIME) : KeyboardManagerForAction {
     override fun getContext(): Context {
         return latinIME
@@ -278,6 +283,17 @@ class UixActionKeyboardManager(val uixManager: UixManager, val latinIME: LatinIM
     override fun createInputTransaction(): ActionInputTransaction {
         return latinIME.imeManager.createInputTransaction()
     }
+
+    override fun captureEditorSession(): Any? {
+        val connection = latinIME.getBaseInputConnection() ?: return null
+        val info = latinIME.getBaseInputEditorInfo() ?: return null
+        return KeyboardEditorSessionToken(connection, info)
+    }
+
+    override fun isEditorSessionCurrent(token: Any?): Boolean =
+        token is KeyboardEditorSessionToken &&
+            token.connection === latinIME.getBaseInputConnection() &&
+            token.info === latinIME.getBaseInputEditorInfo()
 
     override fun typeText(v: String) {
         if(latinIME.isInputConnectionOverridden) {
@@ -298,7 +314,8 @@ class UixActionKeyboardManager(val uixManager: UixManager, val latinIME: LatinIM
     override fun typeUri(
         uri: Uri,
         mimeTypes: List<String>,
-        ignoreConnectionOverride: Boolean
+        ignoreConnectionOverride: Boolean,
+        showUnsupportedMessage: Boolean
     ): Boolean {
         if(mimeTypes.isEmpty()) {
             Log.w("UixManager", "mimeTypes is empty")
@@ -334,7 +351,7 @@ class UixActionKeyboardManager(val uixManager: UixManager, val latinIME: LatinIM
             InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION,
             null
         ).let { result ->
-            if(!result) {
+            if(!result && showUnsupportedMessage) {
                 val toast = Toast.makeText(
                     latinIME,
                     latinIME.getString(R.string.action_clipboard_manager_error_app_image_insertion_unsupported),
