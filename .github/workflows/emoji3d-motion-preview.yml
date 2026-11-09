@@ -13,12 +13,8 @@ on:
 permissions:
   contents: read
 
-# Do not cancel 256px asset generation on an incoming commit. GitHub retains
-# only the newest pending run, and successfully generated assets are cached.
-concurrency:
-  group: fluent-emoji-hq-preview-${{ github.ref }}
-  cancel-in-progress: false
-
+# Keep image asset generation independent: generated caches are durable even
+# when a newer commit supersedes an old APK build. Only APK jobs are cancelled.
 jobs:
   static-assets:
     name: Produce/cache 256px lossless RGBA static artwork
@@ -153,6 +149,9 @@ jobs:
   animated-preview:
     name: Compile, sign and inspect complete Stable Release preview
     needs: [static-assets, motion-assets]
+    concurrency:
+      group: fluent-emoji-hq-apk-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -216,7 +215,11 @@ jobs:
             "platforms;android-35" "build-tools;35.0.0" \
             "ndk;28.2.13676358" "cmake;3.22.1"
 
+      # Pull request jobs normally restore only. Allow write-back so subsequent
+      # commits in this PR reuse Gradle task outputs and the local build cache.
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
       - uses: actions/setup-python@v5
         with:
@@ -232,7 +235,7 @@ jobs:
           set -euo pipefail
           test -f java/shared.keystore
           chmod +x gradlew
-          ./gradlew --no-daemon --stacktrace --warning-mode summary \
+          ./gradlew --no-daemon --stacktrace --build-cache --warning-mode summary \
             testStableReleaseUnitTest assembleStableRelease
 
       - name: Verify all original Fluent files INSIDE signed APK

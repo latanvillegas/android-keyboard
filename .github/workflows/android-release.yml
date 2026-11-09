@@ -246,7 +246,7 @@ jobs:
           set -euo pipefail
           chmod +x gradlew
           # JVM regression tests compile no Debug APK or instrumentation package.
-          ./gradlew --no-daemon --stacktrace --warning-mode summary \
+          ./gradlew --no-daemon --stacktrace --build-cache --warning-mode summary \
             testStableReleaseUnitTest assembleStableRelease
 
       - name: Verify APK signature, contents and SHA-256
