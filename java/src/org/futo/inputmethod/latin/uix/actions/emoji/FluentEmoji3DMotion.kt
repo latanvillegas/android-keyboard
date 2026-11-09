@@ -1,6 +1,8 @@
 package org.futo.inputmethod.latin.uix.actions.emoji
 
 import android.content.Context
+import org.futo.inputmethod.latin.uix.actions.media.FluentHqPackStore
+import java.io.FileNotFoundException
 import java.io.InputStream
 
 /**
@@ -35,7 +37,12 @@ internal object FluentEmoji3DMotion {
     /** Called from Dispatchers.IO. The caller owns and closes the input stream. */
     fun openWebp(context: Context, assetKey: String): InputStream? {
         if (!hasAnimation(context, assetKey)) return null
-        return context.applicationContext.assets.open("$ROOT/$assetKey.webp")
+        FluentHqPackStore.openMotion(context, assetKey)?.let { return it }
+        return try {
+            context.applicationContext.assets.open("$ROOT/$assetKey.webp")
+        } catch (_: FileNotFoundException) {
+            null
+        }
     }
 
     /** Compatibility option for receivers which do not accept animated WebP. */

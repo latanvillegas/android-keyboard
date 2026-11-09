@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import org.futo.inputmethod.latin.uix.actions.media.FluentHqPackStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -148,7 +149,8 @@ object FluentEmoji3D {
     ): Bitmap? {
         val key = assetKey(context, value, category, description) ?: return null
         val highQuality = try {
-            context.applicationContext.assets.open("emoji3d-share/$key.webp").use { input ->
+            (FluentHqPackStore.openShare(context, key)
+                ?: context.applicationContext.assets.open("emoji3d-share/$key.webp")).use { input ->
                 BitmapFactory.decodeStream(input, null, BitmapFactory.Options().apply {
                     inPreferredConfig = Bitmap.Config.ARGB_8888
                     inScaled = false

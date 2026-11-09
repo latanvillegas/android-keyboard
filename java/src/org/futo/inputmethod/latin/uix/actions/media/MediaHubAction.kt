@@ -77,6 +77,13 @@ private fun MediaHubPanel(manager: KeyboardManagerForAction) {
         }
     }
     var filter by remember { mutableStateOf(MediaFilter.ALL) }
+    val hqInstalled by produceState(
+        initialValue = FluentHqPackStore.isInstalled(context)
+    ) {
+        MediaLibrary.changes.collect {
+            value = FluentHqPackStore.isInstalled(context)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(6.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -119,6 +126,18 @@ private fun MediaHubPanel(manager: KeyboardManagerForAction) {
                         maxLines = 1
                     )
                 }
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (hqInstalled) stringResource(R.string.media_hq_ready)
+                else stringResource(R.string.media_hq_optional))
+            if (hqInstalled) {
+                TextButton(onClick = {
+                    manager.getLifecycleScope().launch {
+                        FluentHqPackStore.uninstall(context)
+                    }
+                }) { Text(stringResource(R.string.media_hq_remove)) }
             }
         }
 

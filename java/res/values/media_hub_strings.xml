@@ -8,6 +8,10 @@
     <string name="media_export_failure">Cannot export media ZIP</string>
     <string name="media_export_in_progress">Exporting your offline media pack…</string>
     <string name="media_offline_models">Offline AI models</string>
+    <string name="media_hq_installed">Fluent 3D HQ pack installed, offline 256px quality restored</string>
+    <string name="media_hq_ready">Fluent HQ 256px installed</string>
+    <string name="media_hq_optional">Fluent HQ optional: import ZIP pack for full sharing quality</string>
+    <string name="media_hq_remove">Remove HQ pack</string>
     <string name="media_all">All</string>
     <string name="media_gifs">GIF</string>
     <string name="media_stickers">Stickers</string>
