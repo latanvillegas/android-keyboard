@@ -1,95 +1,122 @@
 #!/usr/bin/env python3
-"""Create an offline-installable Fluent 3D full-color pack for a slim APK.
-
-No recompression of any WebP pixels or animation frames. GitHub keeps GIF
-fallbacks and the 128px picker inside the APK; the optional pack contains
-2,980 256px static RGBA masters plus 30 lossless Animated WebP originals.
-"""
+"""Pack ALL Fluent 3D artwork outside the APK without recompressing pixels."""
 from __future__ import annotations
+
 import argparse
 import hashlib
 import json
+import shutil
 import zipfile
 from pathlib import Path
 
-PACK_FORMAT = "fluent3d-hq-v1"
-METADATA = ("index.txt", "SOURCE.json", "LICENSE.txt")
+FORMAT = "fluent3d-full-v2"
+META = ("index.txt", "SOURCE.json", "LICENSE.txt")
+MAX_MEMBER = 16 * 1024 * 1024
+KEY_CHARACTERS = frozenset("0123456789abcdef-")
 
 
-def sha256(value: bytes) -> str:
-    return hashlib.sha256(value).hexdigest()
+def checksum(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as inp:
+        for chunk in iter(lambda: inp.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
-def gather(static: Path, motion: Path) -> tuple[list[tuple[str, bytes]], int, int]:
-    def keys(folder: Path) -> list[str]:
-        found = (folder / "index.txt").read_text(encoding="utf-8").splitlines()
-        if len(found) != len(set(found)):
-            raise ValueError(f"Duplicate catalog entries: {folder}")
-        return found
-    static_keys = keys(static)
-    motion_keys = keys(motion)
-    if len(static_keys) < 2500 or len(motion_keys) != 30:
-        raise ValueError("Unexpected Fluent catalog count")
-    members: list[tuple[str, bytes]] = []
-    for name, directory, items in (
-        ("emoji3d-share", static, static_keys),
-        ("emoji3d-motion", motion, motion_keys),
+def keys(root: Path) -> list[str]:
+    result = (root / "index.txt").read_text("utf-8").splitlines()
+    if not result or len(result) != len(set(result)) or any(
+        not value or any(c not in KEY_CHARACTERS for c in value)
+        for value in result
     ):
-        for key in items:
-            if not key or any(c not in "0123456789abcdef-" for c in key):
-                raise ValueError(f"Invalid Unicode key: {key}")
-        for file_name in METADATA + tuple(key + ".webp" for key in items):
-            source = directory / file_name
-            if not source.is_file():
-                raise ValueError(f"Missing source artwork: {source}")
-            data = source.read_bytes()
-            if not data or len(data) > 16 * 1024 * 1024:
-                raise ValueError(f"Out of range artwork: {source}")
-            if source.suffix == ".webp":
-                if data[:4] != b"RIFF" or data[8:12] != b"WEBP":
-                    raise ValueError(f"Not WebP: {source}")
-            members.append((f"{name}/{file_name}", data))
-    return members, len(static_keys), len(motion_keys)
+        raise ValueError(f"Invalid Fluent index: {root}")
+    return result
 
 
-def build(static: Path, motion: Path, output: Path) -> None:
-    members, static_count, motion_count = gather(static, motion)
+def inventory(preview: Path, share: Path, motion: Path):
+    ui, high, animated = keys(preview), keys(share), keys(motion)
+    if len(ui) < 2500 or ui != high or len(animated) != 30:
+        raise ValueError("Fluent catalog mismatch or wrong animation count")
+    groups = (
+        ("emoji3d", preview, (key + ".webp" for key in ui)),
+        ("emoji3d-share", share, (key + ".webp" for key in high)),
+        ("emoji3d-motion", motion,
+         (key + suffix for key in animated for suffix in (".webp", ".gif"))),
+    )
+    files: list[tuple[str, Path, str]] = []
+    for prefix, root, images in groups:
+        for basename in [*META, *images]:
+            source = root / basename
+            if not source.is_file() or not (0 < source.stat().st_size <= MAX_MEMBER):
+                raise ValueError(f"Missing/oversized Fluent asset: {source}")
+            if basename.endswith(".webp"):
+                with source.open("rb") as stream:
+                    header = stream.read(12)
+                if header[:4] != b"RIFF" or header[8:12] != b"WEBP":
+                    raise ValueError(f"Invalid WebP: {source}")
+            if basename.endswith(".gif"):
+                with source.open("rb") as stream:
+                    if stream.read(6) not in (b"GIF89a", b"GIF87a"):
+                        raise ValueError(f"Invalid GIF: {source}")
+            files.append((f"{prefix}/{basename}", source, checksum(source)))
+    if len(files) > 6500:
+        raise ValueError("Excessive pack inventory")
+    return files, ui, animated
+
+
+def stable_info(filename: str) -> zipfile.ZipInfo:
+    info = zipfile.ZipInfo(filename, date_time=(1980, 1, 1, 0, 0, 0))
+    info.compress_type = zipfile.ZIP_STORED
+    info.create_system = 3
+    info.external_attr = 0o644 << 16
+    return info
+
+
+def build(preview: Path, share: Path, motion: Path, output: Path) -> None:
+    files, ui, animated = inventory(preview, share, motion)
     manifest = {
-        "format": PACK_FORMAT,
-        "version": 1,
-        "static_count": static_count,
-        "motion_count": motion_count,
-        "members": {name: sha256(data) for name, data in members},
-        "description": "Microsoft Fluent 3D lossless RGBA static + Animated WebP",
-        "distribution": "offline installable media files; no executable code",
+        "format": FORMAT,
+        "version": 2,
+        "ui_count": len(ui),
+        "share_count": len(ui),
+        "motion_count": len(animated),
+        "members": {name: digest for name, _, digest in files},
+        "license": "Microsoft Fluent Emoji (MIT); see LICENSE.txt in pack",
     }
-    manifest_bytes = (json.dumps(manifest, separators=(",", ":"), sort_keys=True)
-                      + "\n").encode("utf-8")
+    encoded = (json.dumps(manifest, sort_keys=True, separators=(",", ":")) +
+               "\n").encode("utf-8")
+    if len(encoded) > 2 * 1024 * 1024:
+        raise ValueError("Manifest size limit exceeded")
     output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(output, "w", allowZip64=True) as archive:
-        # First entry permits deterministic detection without scanning 3k files.
-        archive.writestr("fluent-hq.json", manifest_bytes,
-                         compress_type=zipfile.ZIP_STORED)
-        for name, data in members:
-            archive.writestr(name, data, compress_type=zipfile.ZIP_STORED)
+        archive.writestr(stable_info("fluent-hq.json"), encoded)
+        for name, source, _ in files:
+            with archive.open(stable_info(name), "w") as out:
+                with source.open("rb") as inp:
+                    shutil.copyfileobj(inp, out, 1024 * 1024)
     with zipfile.ZipFile(output) as archive:
-        assert archive.namelist()[0] == "fluent-hq.json"
-        assert len(archive.namelist()) == len(members) + 1
-        for name, expected in manifest["members"].items():
-            if sha256(archive.read(name)) != expected:
-                raise ValueError(f"Corrupt pack member: {name}")
-    print(f"Fluent HQ pack: {static_count} static 256px masters, "
-          f"{motion_count} animated WebP, "
-          f"{output.stat().st_size / 1048576:.1f} MiB, SHA256 {sha256(output.read_bytes())}")
+        if archive.namelist()[0] != "fluent-hq.json" or len(archive.namelist()) != len(files) + 1:
+            raise ValueError("Incomplete ZIP inventory")
+        for name, _, expected in files:
+            digest = hashlib.sha256()
+            with archive.open(name) as inp:
+                for chunk in iter(lambda: inp.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            if digest.hexdigest() != expected:
+                raise ValueError(f"Corrupt Fluent pack member: {name}")
+    print(f"Verified pack: {len(ui)} picker and lossless sharing images; "
+          f"{len(animated)} Animated WebP and {len(animated)} GIF; "
+          f"{output.stat().st_size / 1048576:.1f} MiB.")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--static", type=Path, required=True)
+    parser.add_argument("--preview", type=Path, required=True)
+    parser.add_argument("--share", type=Path, required=True)
     parser.add_argument("--motion", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
-    build(args.static, args.motion, args.out)
+    build(args.preview, args.share, args.motion, args.out)
 
 
 if __name__ == "__main__":

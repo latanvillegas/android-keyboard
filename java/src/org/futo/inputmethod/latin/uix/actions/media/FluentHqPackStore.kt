@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.futo.inputmethod.latin.uix.actions.emoji.FluentEmoji3D
+import org.futo.inputmethod.latin.uix.actions.emoji.FluentEmoji3DMotion
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
@@ -20,15 +22,16 @@ import java.util.zip.ZipInputStream
  * selected APK distribution. The base APK keeps its GIF fallbacks.
  */
 internal object FluentHqPackStore {
-    private const val ROOT = "fluent-hq-v1"
+    private const val ROOT = "fluent-full-v2"
     private const val COMPLETE = ".installed"
-    private const val MAX_PACK_MEMBERS = 3200
-    private const val MAX_PACK_BYTES = 192L * 1024 * 1024
+    private const val MAX_PACK_MEMBERS = 6500
+    private const val MAX_PACK_BYTES = 224L * 1024 * 1024
     private const val MAX_ENTRY_BYTES = 16L * 1024 * 1024
-    private const val MAX_MANIFEST_BYTES = 512 * 1024
+    private const val MAX_MANIFEST_BYTES = 2 * 1024 * 1024
     private val keyPattern = Regex("[0-9a-f]+(?:-[0-9a-f]+)*")
     private val names = Regex(
-        "(?:emoji3d-share|emoji3d-motion)/(?:[0-9a-f]+(?:-[0-9a-f]+)*\\.webp|index\\.txt|LICENSE\\.txt|SOURCE\\.json)"
+        "(?:emoji3d|emoji3d-share|emoji3d-motion)/" +
+            "(?:[0-9a-f]+(?:-[0-9a-f]+)*\\.(?:webp|gif)|index\\.txt|LICENSE\\.txt|SOURCE\\.json)"
     )
     private val lock = Any()
 
@@ -39,19 +42,51 @@ internal object FluentHqPackStore {
     fun isInstalled(context: Context): Boolean =
         File(current(context), COMPLETE).isFile
 
-    private fun open(context: Context, folder: String, key: String): InputStream? {
-        if (!keyPattern.matches(key) || !isInstalled(context)) return null
-        val source = File(current(context), folder + "/" + key + ".webp")
-        return if (source.isFile && source.length() in 1..MAX_ENTRY_BYTES)
-            source.inputStream()
-        else null
+    fun contentVersion(context: Context): String = try {
+        File(current(context), COMPLETE).takeIf { it.isFile }
+            ?.readText(Charsets.UTF_8) ?: "no-pack"
+    } catch (_: IOException) {
+        "no-pack"
     }
 
+    fun keys(context: Context, folder: String): Set<String>? {
+        if (folder != "emoji3d" && folder != "emoji3d-share" &&
+            folder != "emoji3d-motion") return null
+        if (!isInstalled(context)) return null
+        return try {
+            File(File(current(context), folder), "index.txt")
+                .useLines(Charsets.UTF_8) { lines ->
+                    lines.filter { validKey -> keyPattern.matches(validKey) }.toHashSet()
+                }
+        } catch (_: IOException) {
+            null
+        }
+    }
+
+    private fun open(
+        context: Context, folder: String, key: String, extension: String
+    ): InputStream? {
+        if (!keyPattern.matches(key) || !isInstalled(context)) return null
+        val source = File(current(context), folder + "/" + key + "." + extension)
+        return try {
+            if (source.isFile && source.length() in 1L..MAX_ENTRY_BYTES)
+                source.inputStream() else null
+        } catch (_: IOException) {
+            null
+        }
+    }
+
+    fun openPicker(context: Context, key: String): InputStream? =
+        open(context, "emoji3d", key, "webp")
+
     fun openShare(context: Context, key: String): InputStream? =
-        open(context, "emoji3d-share", key)
+        open(context, "emoji3d-share", key, "webp")
 
     fun openMotion(context: Context, key: String): InputStream? =
-        open(context, "emoji3d-motion", key)
+        open(context, "emoji3d-motion", key, "webp")
+
+    fun openGif(context: Context, key: String): InputStream? =
+        open(context, "emoji3d-motion", key, "gif")
 
     /** Optional pack recognition without reading the entire archive. */
     fun isFluentPack(context: Context, uri: Uri): Boolean {
@@ -93,42 +128,52 @@ internal object FluentHqPackStore {
             result.write(buffer, 0, count)
         }
         val json = JSONObject(result.toString("UTF-8"))
-        if (json.optString("format") != "fluent3d-hq-v1" ||
-            json.optInt("version") != 1 ||
-            json.optInt("static_count") < 2500 ||
+        if (json.optString("format") != "fluent3d-full-v2" ||
+            json.optInt("version") != 2 ||
+            json.optInt("ui_count") !in 2500..3500 ||
+            json.optInt("share_count") != json.optInt("ui_count") ||
             json.optInt("motion_count") != 30) {
             throw IOException("Unsupported Fluent pack format")
         }
         return json
     }
 
-    private fun validateCatalog(folder: File, expected: Int) {
+    private fun validateCatalog(root: File, folderName: String, expected: Int) {
+        val folder = File(root, folderName)
         val keys = File(folder, "index.txt").readLines(Charsets.UTF_8)
         if (keys.size != expected || keys.toSet().size != expected ||
             keys.any { !keyPattern.matches(it) }) {
-            throw IOException("Invalid Fluent artwork index")
+            throw IOException("Invalid Fluent catalog: $folderName")
         }
         if (!File(folder, "LICENSE.txt").isFile ||
             !File(folder, "SOURCE.json").isFile) {
-            throw IOException("Fluent source metadata is missing")
+            throw IOException("Missing Fluent attribution")
         }
-        for (key in keys) {
-            val file = File(folder, key + ".webp")
-            if (!file.isFile || file.length() !in 1..MAX_ENTRY_BYTES) {
-                throw IOException("Missing Fluent artwork: " + key)
-            }
+        val formats = if (folderName == "emoji3d-motion")
+            listOf("webp", "gif") else listOf("webp")
+        for (key in keys) for (format in formats) {
+            val file = File(folder, "$key.$format")
+            if (!file.isFile || file.length() !in 1L..MAX_ENTRY_BYTES)
+                throw IOException("Missing Fluent art: $key.$format")
             val header = ByteArray(12)
-            FileInputStream(file).use { input ->
-                var offset = 0
-                while (offset < header.size) {
-                    val n = input.read(header, offset, header.size - offset)
-                    if (n < 0) break
-                    offset += n
+            val filled = file.inputStream().use { source ->
+                var position = 0
+                while (position < 12) {
+                    val count = source.read(header, position, 12 - position)
+                    if (count < 0) break
+                    position += count
                 }
+                position
             }
-            if (String(header, 0, 4, Charsets.US_ASCII) != "RIFF" ||
-                String(header, 8, 4, Charsets.US_ASCII) != "WEBP")
-                throw IOException("Invalid Fluent WebP: " + key)
+            if (filled != 12) throw IOException("Truncated Fluent artwork")
+            val valid = if (format == "webp") {
+                String(header, 0, 4, Charsets.US_ASCII) == "RIFF" &&
+                    String(header, 8, 4, Charsets.US_ASCII) == "WEBP"
+            } else {
+                val magic = String(header, 0, 6, Charsets.US_ASCII)
+                magic == "GIF89a" || magic == "GIF87a"
+            }
+            if (!valid) throw IOException("Invalid Fluent artwork header")
         }
     }
 
@@ -154,7 +199,9 @@ internal object FluentHqPackStore {
                         val manifest = readManifest(archive)
                         archive.closeEntry()
                         val files = manifest.getJSONObject("members")
-                        if (files.length() !in 2500..MAX_PACK_MEMBERS)
+                        val expectedCount = 2 * manifest.getInt("ui_count") +
+                            2 * manifest.getInt("motion_count") + 9
+                        if (expectedCount > MAX_PACK_MEMBERS || files.length() != expectedCount)
                             throw IOException("Invalid Fluent pack inventory")
 
                         var count = 0
@@ -196,16 +243,24 @@ internal object FluentHqPackStore {
                         if (seen.size != files.length())
                             throw IOException("Fluent pack incomplete")
                         validateCatalog(
-                            File(stage, "emoji3d-share"),
-                            manifest.getInt("static_count")
+                            stage, "emoji3d", manifest.getInt("ui_count")
                         )
                         validateCatalog(
-                            File(stage, "emoji3d-motion"),
-                            manifest.getInt("motion_count")
+                            stage, "emoji3d-share", manifest.getInt("share_count")
                         )
+                        validateCatalog(
+                            stage, "emoji3d-motion", manifest.getInt("motion_count")
+                        )
+                        if (!File(stage, "emoji3d/index.txt").readBytes().contentEquals(
+                                File(stage, "emoji3d-share/index.txt").readBytes())) {
+                            throw IOException("Fluent UI and sharing indexes differ")
+                        }
                     }
                 }
-                File(stage, COMPLETE).writeText("installed")
+                File(stage, COMPLETE).writeText(
+                    System.currentTimeMillis().toString() + "-" + System.nanoTime(),
+                    Charsets.UTF_8
+                )
                 val dest = current(context)
                 val backup = File(parent, ROOT + "-backup")
                 if (backup.exists()) backup.deleteRecursively()
@@ -216,6 +271,11 @@ internal object FluentHqPackStore {
                     throw IOException("Unable to publish Fluent pack")
                 }
                 backup.deleteRecursively()
+                // A previously installed v1 pack lacks picker/GIF assets.
+                // Clean it only after successfully activating the complete v2.
+                File(parent, "fluent-hq-v1").deleteRecursively()
+                FluentEmoji3D.invalidateResources()
+                FluentEmoji3DMotion.invalidateResources()
                 MediaLibrary.changes.tryEmit(Unit)
                 1
             } finally {
@@ -228,7 +288,11 @@ internal object FluentHqPackStore {
         synchronized(lock) {
             val installed = current(context)
             val removed = installed.isDirectory && installed.deleteRecursively()
-            if (removed) MediaLibrary.changes.tryEmit(Unit)
+            if (removed) {
+                FluentEmoji3D.invalidateResources()
+                FluentEmoji3DMotion.invalidateResources()
+                MediaLibrary.changes.tryEmit(Unit)
+            }
             removed
         }
     }

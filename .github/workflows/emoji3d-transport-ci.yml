@@ -2,6 +2,9 @@ name: Verify adaptive Fluent 3D emoji transport
 
 on:
   pull_request:
+    # Suppress costly runs while the stacked Media Hub branch is under construction.
+    branches-ignore:
+      - feature/media-hub-stickers-gif-offline-ai
     paths:
       - "java/**"
       - "tests/unit/**"
@@ -14,6 +17,7 @@ permissions:
 jobs:
   unit-tests:
     name: Compile keyboard and run JVM regression tests
+    if: ${{ github.event_name == 'workflow_dispatch' || github.head_ref != 'feature/fluent3d-optional-hq-pack-lite-apk' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:

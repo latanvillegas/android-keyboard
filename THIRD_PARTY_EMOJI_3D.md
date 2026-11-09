@@ -1,73 +1,39 @@
-# Fluent Emoji 3D assets — third-party notice
+# Microsoft Fluent Emoji 3D — third-party notice
 
-The emoji 3D artwork used in the Release APK is the original,
-transparent, full-color **Microsoft Fluent Emoji 3D** artwork,
-distributed under the MIT License.
+This project uses original Microsoft Fluent Emoji 3D artwork under the MIT
+License. The app itself remains functional with native Unicode emojis even
+when no Fluent 3D media is installed.
 
-Original: https://github.com/microsoft/fluentui-emoji
+- Primary artwork: https://github.com/microsoft/fluentui-emoji
+- Unicode-organized source: https://github.com/shuding/fluentui-emoji-unicode
+- Pinned static source: 7a40f1a2d064d76e436813edc0f09b6c8cde5da8
+- Original animations: https://github.com/microsoft/fluentui-emoji-animated
+- Pinned animation source: daa0365c09795789ed2bc6e8b228c97736cb6669
+- Copyright (c) Microsoft Corporation; license: MIT.
 
-Unicode-organized mirror: https://github.com/shuding/fluentui-emoji-unicode
+## Runtime packaging
 
-Pinned mirror commit: `7a40f1a2d064d76e436813edc0f09b6c8cde5da8`
+The Core APK does NOT include Microsoft Fluent bitmap or GIF catalogs.
+The optional external offline file fluent3d-full-offline-collection.zip
+contains all four original media catalogs:
 
-The GitHub Actions release pipeline downloads the pinned source archive and
-converts the PNGs to transparent 128px WebP images. The build embeds all
-2,980 codepoint-named 3D assets and the verbatim MIT license under
-`assets/emoji3d/`. **No runtime network connection** is used.
+1. 2,980 128px transparent WebP illustrations for the emoji picker.
+2. 2,980 256px lossless RGBA WebP masters for PNG sharing.
+3. 30 original Animated WebP 256px lossless RGBA sequences.
+4. 30 GIF 256px compatible animated sequences.
 
-The images are pre-rendered 3D artwork. They are not interactive GLB meshes.
-Their original colors are preserved, without theme tinting, background
-discs or simulated per-cell 3D cards.
+Only the original Microsoft 3D artwork is included; no interactive 3D
+meshes or invented frame motion. The per-source LICENSE.txt and SOURCE.json
+files are included in the external ZIP, with SHA-256 inventory verification.
+There is no automatic network access in the installed keyboard.
 
-The selected Unicode sequence remains the fallback when the receiving editor
-does not support PNG insertion, the chosen asset is missing, the 3D setting is
-disabled, or the editor rejects the content request. Compatible editors can
-receive the same Fluent artwork as an image/png attachment through the private
-content provider. This does not change or replace the original Fluent artwork.
-For ASCII emoticons/kaomoji, the panel may show a semantically corresponding
-3D Fluent face; the original ASCII string is retained for Unicode fallback.
-The receiving app controls whether an inserted image is displayed inline or
-as an attachment.
+The source animation is imported from original Microsoft APNG using pinned
+Git LFS paths and preserves overall motion duration. WebP retains full
+per-pixel RGBA lossless color; GIF itself cannot reproduce 24-bit RGB+alpha
+fidelity and is offered as a compatibility option, not a quality-equivalent
+substitute.
 
-MIT copyright notice: Copyright (c) Microsoft Corporation.
-
-The full license text is included in the packaged APK at
-`assets/emoji3d/LICENSE.txt`.
-
-
-## Authentic Fluent 3D animations (optional motion catalog)
-
-A separate curated set of 30 emoji includes **original animated frame sequences**
-from `microsoft/fluentui-emoji-animated`, which is MIT-licensed by Microsoft.
-
-- Upstream: https://github.com/microsoft/fluentui-emoji-animated
-- Immutable commit: `daa0365c09795789ed2bc6e8b228c97736cb6669`
-- Frame source: 256px animated PNG (APNG) in Git LFS.
-- Shipping format: transparent looping GIF, 128px and at most 48 retained
-  original frames; source duration is preserved when sampling.
-- The Release build uses selective Git LFS fetch to retrieve only this
-  selection. No runtime download occurs.
-- The complete Microsoft MIT notice is packaged as
-  `assets/emoji3d-motion/LICENSE.txt`; `SOURCE.json` records source paths
-  and SHA-256 values.
-
-Not every Fluent emoji has an animation in the APK. Unsupported or missing
-motion content is never replaced by a mismatched emoji or a fake motion effect;
-the existing static 3D illustration and Unicode fallback remain available.
-
-
-## High-fidelity 3D distribution
-
-The animation assets described above are now distributed in **two formats**
-for each selected Unicode sequence: full-color, lossless **256px Animated
-WebP RGBA** (original Microsoft motion; up to 96 frames), and **256px GIF**
-for legacy chat support (limited to 256 palette colors per GIF frame).
-
-Static 3D illustrations are built into two distinct variants from the same
-licensed source: the compact 128px picker preview and a lossless 256px
-sharing master used to generate PNG inserts. The MIT licenses and source
-manifests are included under `assets/emoji3d/`,
-`assets/emoji3d-share/` and `assets/emoji3d-motion/`.
-
-This enhancement preserves the original source illustration and does not
-introduce non-Microsoft source artwork or synthesize facial motion.
+The receiving app controls whether inserted files remain animated, are
+recompressed, or require the user to confirm sending. The keyboard uses
+Android commitContent for supported MIME types and exact Unicode fallback
+when content cannot be sent. This does not alter the original artwork.

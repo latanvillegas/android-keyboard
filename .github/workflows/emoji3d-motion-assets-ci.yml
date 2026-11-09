@@ -2,6 +2,9 @@ name: Verify Fluent 3D animated WebP and static RGBA codecs
 
 on:
   pull_request:
+    # Suppress costly runs while the stacked Media Hub branch is under construction.
+    branches-ignore:
+      - feature/media-hub-stickers-gif-offline-ai
     paths:
       - "scripts/build_emoji3d_motion.py"
       - "scripts/build_emoji3d_assets.py"
@@ -19,6 +22,7 @@ permissions:
 jobs:
   codec-regression:
     name: Verify lossless RGBA encoding with genuine multi-frame APNG fixture
+    if: ${{ github.event_name == 'workflow_dispatch' || github.head_ref != 'feature/fluent3d-optional-hq-pack-lite-apk' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

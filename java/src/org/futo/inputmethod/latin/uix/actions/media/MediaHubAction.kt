@@ -40,6 +40,7 @@ import org.futo.inputmethod.latin.R
 import org.futo.inputmethod.latin.uix.Action
 import org.futo.inputmethod.latin.uix.ActionWindow
 import org.futo.inputmethod.latin.uix.KeyboardManagerForAction
+import org.futo.inputmethod.latin.uix.settings.SettingsActivity
 
 /** User-customizable action, added without rewriting the existing emoji panel. */
 val MediaHubAction = Action(
@@ -111,6 +112,11 @@ private fun MediaHubPanel(manager: KeyboardManagerForAction) {
             }) {
                 Text(stringResource(R.string.media_export))
             }
+        }
+        TextButton(onClick = {
+            SettingsActivity.openToNavDest(context, "models")
+        }) {
+            Text(stringResource(R.string.media_offline_models))
         }
         Row(modifier = Modifier.fillMaxWidth()) {
             val filters = listOf(

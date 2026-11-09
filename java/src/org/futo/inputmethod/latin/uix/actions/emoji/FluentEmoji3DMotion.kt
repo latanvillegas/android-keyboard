@@ -8,8 +8,8 @@ import java.io.InputStream
 /**
  * Offline index for original Microsoft Fluent animations, not synthetic motion.
  *
- * Every bundled Unicode key has two real animated variants: lossless RGBA WebP
- * and a compatibility GIF. Source media is generated at build time only.
+ * Every installed Unicode key has two original variants: lossless Animated
+ * WebP and GIF. Both are loaded from the verified optional offline pack.
  */
 internal object FluentEmoji3DMotion {
     private const val ROOT = "emoji3d-motion"

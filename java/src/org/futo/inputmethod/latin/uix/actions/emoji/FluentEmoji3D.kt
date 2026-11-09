@@ -24,7 +24,7 @@ import java.util.concurrent.Executors
  *
  * Source: microsoft/fluentui-emoji (MIT), organized by Unicode in
  * shuding/fluentui-emoji-unicode. Images and the attribution notice are
- * packaged into the Release APK at build time. There are no network calls.
+ * distributed in an optional verified offline ZIP, not inside the APK.
  *
  * Missing assets fall back to the system Unicode renderer; skin tones are
  * NEVER silently changed to the default tone.

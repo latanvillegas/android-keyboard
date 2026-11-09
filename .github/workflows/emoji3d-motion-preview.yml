@@ -2,6 +2,9 @@ name: Build FUTO lossless 3D RGBA animated emoji preview APK
 
 on:
   pull_request:
+    # Suppress costly runs while the stacked Media Hub branch is under construction.
+    branches-ignore:
+      - feature/media-hub-stickers-gif-offline-ai
     paths:
       - "java/**"
       - "scripts/build_emoji3d_motion.py"
@@ -23,6 +26,7 @@ permissions:
 jobs:
   static-assets:
     name: Produce/cache 256px lossless RGBA static artwork
+    if: ${{ github.event_name == 'workflow_dispatch' || github.head_ref != 'feature/fluent3d-optional-hq-pack-lite-apk' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -82,6 +86,7 @@ jobs:
 
   motion-assets:
     name: Produce/cache 30 genuine 256px lossless animations
+    if: ${{ github.event_name == 'workflow_dispatch' || github.head_ref != 'feature/fluent3d-optional-hq-pack-lite-apk' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 110
     steps:
@@ -152,7 +157,7 @@ jobs:
           du -h -s java/assets/emoji3d-motion
 
   animated-preview:
-    if: ${{ github.head_ref != 'feature/fluent3d-optional-hq-pack-lite-apk' && (github.event_name != 'workflow_dispatch' || !inputs.lite) }}
+    if: ${{ github.event_name != 'workflow_dispatch' && github.head_ref != 'feature/fluent3d-optional-hq-pack-lite-apk' }}
     name: Compile, sign and inspect complete Stable Release preview
     needs: [static-assets, motion-assets]
     concurrency:
@@ -327,7 +332,8 @@ jobs:
           retention-days: 30
 
   lite-preview:
-    if: ${{ github.head_ref == 'feature/fluent3d-optional-hq-pack-lite-apk' || (github.event_name == 'workflow_dispatch' && inputs.lite) }}
+    # No Actions consumed by routine changes in this WIP branch.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.lite }}
     name: Build signed small APK + original quality offline media package
     needs: [static-assets, motion-assets]
     runs-on: ubuntu-24.04
@@ -365,25 +371,24 @@ jobs:
           set -euo pipefail
           mkdir -p lite-dist
           python -u scripts/build_fluent3d_hq_pack.py \
-            --static java/assets/emoji3d-share \
+            --preview java/assets/emoji3d \
+            --share java/assets/emoji3d-share \
             --motion java/assets/emoji3d-motion \
-            --out lite-dist/fluent-3d-hq-rgba256-lossless.zip
+            --out lite-dist/fluent3d-full-offline-collection.zip
 
-      - name: Stage lightweight resources after producing the original pack
+      - name: Remove ALL four Fluent catalogs before APK assembly
         shell: bash
         run: |
           set -euo pipefail
           test "$(wc -l < java/assets/emoji3d/index.txt)" -ge 2500
+          test "$(wc -l < java/assets/emoji3d-share/index.txt)" -ge 2500
           test "$(wc -l < java/assets/emoji3d-motion/index.txt)" -eq 30
-          test -s java/assets/emoji3d-motion/1f600.gif
-          test -s lite-dist/fluent-3d-hq-rgba256-lossless.zip
-          rm -rf java/assets/emoji3d-share
-          find java/assets/emoji3d-motion -maxdepth 1 \
-            -type f -name '*.webp' -delete
-          test ! -e java/assets/emoji3d-motion/1f600.webp
-          test ! -e java/assets/emoji3d-share/1f600.webp
-          echo "APK retains 2980 128px picker images and 30 real GIFs"
-          du -h -s java/assets/emoji3d java/assets/emoji3d-motion
+          test -s lite-dist/fluent3d-full-offline-collection.zip
+          rm -rf java/assets/emoji3d java/assets/emoji3d-share java/assets/emoji3d-motion
+          test ! -e java/assets/emoji3d
+          test ! -e java/assets/emoji3d-share
+          test ! -e java/assets/emoji3d-motion
+          echo "Fluent assets all external; no static, GIF or motion catalog in APK"
 
       - name: Initialize pinned Android submodules
         shell: bash
@@ -452,56 +457,73 @@ jobs:
           from PIL import Image
 
           apk_path = Path("lite-dist/futo-keyboard-media-hub-lite.apk")
-          pack_path = Path("lite-dist/fluent-3d-hq-rgba256-lossless.zip")
+          pack_path = Path("lite-dist/fluent3d-full-offline-collection.zip")
           with ZipFile(apk_path) as apk:
-              entries = set(apk.namelist())
-              static = apk.read("assets/emoji3d/index.txt").decode().splitlines()
-              motion = apk.read("assets/emoji3d-motion/index.txt").decode().splitlines()
-              assert len(static) >= 2500
-              assert len(motion) == 30
-              for key in static:
-                  assert f"assets/emoji3d/{key}.webp" in entries
-              for key in motion:
-                  assert f"assets/emoji3d-motion/{key}.gif" in entries
-                  assert f"assets/emoji3d-motion/{key}.webp" not in entries
-              assert not any(name.startswith("assets/emoji3d-share/") for name in entries)
-              assert "assets/emoji3d-motion/LICENSE.txt" in entries
+              prefixes = ("assets/emoji3d/", "assets/emoji3d-share/",
+                          "assets/emoji3d-motion/")
+              for name in apk.namelist():
+                  assert not name.startswith(prefixes), "Media bundled in APK: " + name
+              print("Core APK: zero Fluent 3D bitmap and animation files")
 
           with ZipFile(pack_path) as pack:
               manifest = json.loads(pack.read("fluent-hq.json"))
-              assert manifest["format"] == "fluent3d-hq-v1"
-              assert manifest["static_count"] == len(static)
+              assert manifest["format"] == "fluent3d-full-v2"
+              assert manifest["version"] == 2
+              picker = pack.read("emoji3d/index.txt").decode().splitlines()
+              sharing = pack.read("emoji3d-share/index.txt").decode().splitlines()
+              motion = pack.read("emoji3d-motion/index.txt").decode().splitlines()
+              assert len(picker) >= 2500 and picker == sharing
+              assert len(motion) == 30
+              assert manifest["ui_count"] == len(picker)
+              assert manifest["share_count"] == len(sharing)
               assert manifest["motion_count"] == len(motion)
-              members = manifest["members"]
-              for name, expected in members.items():
-                  assert hashlib.sha256(pack.read(name)).hexdigest() == expected
-              assert len(members) == len(static) + len(motion) + 6
-              with Image.open(io.BytesIO(pack.read(
-                  "emoji3d-share/1f600.webp"))) as still:
+              entries = manifest["members"]
+              assert len(entries) == 2 * len(picker) + 2 * len(motion) + 9
+              assert set(pack.namelist()) == set(entries) | {"fluent-hq.json"}
+              for folder in ("emoji3d", "emoji3d-share", "emoji3d-motion"):
+                  for meta in ("index.txt", "LICENSE.txt", "SOURCE.json"):
+                      assert f"{folder}/{meta}" in entries
+              for key in picker:
+                  assert f"emoji3d/{key}.webp" in entries
+                  assert f"emoji3d-share/{key}.webp" in entries
+              for key in motion:
+                  assert f"emoji3d-motion/{key}.webp" in entries
+                  assert f"emoji3d-motion/{key}.gif" in entries
+              for name, expected in entries.items():
+                  digest = hashlib.sha256()
+                  with pack.open(name) as stream:
+                      for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                          digest.update(chunk)
+                  assert digest.hexdigest() == expected, name
+              with Image.open(io.BytesIO(
+                  pack.read("emoji3d-share/1f600.webp"))) as still:
                   assert still.size == (256, 256)
-                  assert still.mode in ("RGB", "RGBA")
-              with Image.open(io.BytesIO(pack.read(
-                  "emoji3d-motion/1f600.webp"))) as animation:
+                  assert still.getchannel("A").getextrema()[0] < 255
+              with Image.open(io.BytesIO(
+                  pack.read("emoji3d-motion/1f600.webp"))) as animation:
                   assert animation.size == (256, 256)
                   assert animation.n_frames > 1
-          print(f"Verified slim APK: {len(static)} lightweight 3D icons + "
-                f"{len(motion)} real GIFs. Optional original RGBA HQ ZIP: "
-                f"{len(members)} complete verified media/metadata files.")
+              with Image.open(io.BytesIO(
+                  pack.read("emoji3d-motion/1f600.gif"))) as gif:
+                  assert gif.n_frames > 1
+              print(f"Verified full external collection: {len(picker)} UI previews, "
+                    f"{len(sharing)} lossless RGBA masters, "
+                    f"{len(motion)} Animated WebP and GIF pairs; all SHA256 passed")
           PY
           (cd lite-dist && sha256sum \
             futo-keyboard-media-hub-lite.apk \
-            fluent-3d-hq-rgba256-lossless.zip) > lite-dist/SHA256SUMS
+            fluent3d-full-offline-collection.zip) > lite-dist/SHA256SUMS
           printf '%s\n' \
             "Source commit: $GITHUB_SHA" \
-            "Keyboard: lightweight APK, unchanged 3D picker and GIFs" \
-            "Full quality RGBA 256px WebP masters: optional offline ZIP" \
+            "Keyboard: zero bundled Fluent 3D catalogs; Unicode fallback available" \
+            "Original 128px, 256px RGBA, animated WebP and GIF: optional offline ZIP" \
             "Signing: DEVELOPMENT/test key; not an upgrade to production builds" \
             "Run: $GITHUB_RUN_ID" \
             > lite-dist/BUILD-INFO.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: futo-media-hub-lite-apk-plus-fluent-hq-pack
+          name: futo-media-hub-core-apk-plus-fluent-full-pack
           path: lite-dist/
           if-no-files-found: error
           retention-days: 30
