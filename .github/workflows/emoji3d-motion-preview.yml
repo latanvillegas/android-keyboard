@@ -435,8 +435,11 @@ jobs:
           set -euo pipefail
           test -f java/shared.keystore
           chmod +x gradlew
+          # Compile/test first; do not launch the costly APK tasks on a JVM test failure.
           ./gradlew --no-daemon --build-cache --stacktrace \
-            --warning-mode summary testStableReleaseUnitTest assembleStableRelease
+            --warning-mode summary testStableReleaseUnitTest
+          ./gradlew --no-daemon --build-cache --stacktrace \
+            --warning-mode summary assembleStableRelease
 
       - name: Build OPTIONAL signed no-network local AI runtime APK
         shell: bash
