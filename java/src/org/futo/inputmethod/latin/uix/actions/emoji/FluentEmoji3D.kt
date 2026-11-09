@@ -134,6 +134,32 @@ object FluentEmoji3D {
         description: String? = null
     ): String? = resolve(context.applicationContext, value, category, description)
 
+    /**
+     * Decodes the lossless high-resolution 3D artwork for image sharing only.
+     * Never inflates the RecyclerView preview bitmap cache with 256px assets.
+     * Missing share resources (e.g. Debug builds) fall back to the UI preview.
+     * Must be called from Dispatchers.IO.
+     */
+    fun loadShareBitmap(
+        context: Context,
+        value: String,
+        category: String? = null,
+        description: String? = null
+    ): Bitmap? {
+        val key = assetKey(context, value, category, description) ?: return null
+        val highQuality = try {
+            context.applicationContext.assets.open("emoji3d-share/$key.webp").use { input ->
+                BitmapFactory.decodeStream(input, null, BitmapFactory.Options().apply {
+                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                    inScaled = false
+                })
+            }
+        } catch (_: Exception) {
+            null
+        }
+        return highQuality ?: loadBitmap(context, value, category, description)
+    }
+
     /** Intended for Dispatchers.IO; never call this on the UI thread. */
     fun loadBitmap(
         context: Context,
