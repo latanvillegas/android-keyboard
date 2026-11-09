@@ -210,8 +210,8 @@ def convert_apng(source: Path, output_webp: Path, output_gif: Path) -> dict:
 
 
 def package(source_root: Path, destination: Path) -> int:
-    if not features.check("webp_anim") or not features.check("webp"):
-        raise RuntimeError("Pillow must include libwebp animated encoder support")
+    if not features.check("webp"):
+        raise RuntimeError("Pillow must include the libwebp encoder")
 
     license_file = source_root / "LICENSE"
     if not license_file.is_file() or "MIT License" not in license_file.read_text(
