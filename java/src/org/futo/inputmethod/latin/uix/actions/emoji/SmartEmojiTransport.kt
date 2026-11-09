@@ -26,6 +26,18 @@ internal object SmartEmojiTransport {
         EDITOR_CHANGED
     }
 
+    /** MIME negotiation is deterministic and can be regression-tested without Android. */
+    internal fun preferredMimeTypes(
+        useThreeD: Boolean,
+        accepts: (String) -> Boolean
+    ): List<String> {
+        if (!useThreeD) return emptyList()
+        return listOf(
+            Emoji3DShareStore.ANIMATED_MIME_TYPE,
+            Emoji3DShareStore.MIME_TYPE
+        ).filter(accepts)
+    }
+
     suspend fun send(
         manager: KeyboardManagerForAction,
         item: EmojiItem,
@@ -37,14 +49,11 @@ internal object SmartEmojiTransport {
         }
 
         if (useThreeD) {
-            // Do not offer a GIF to an editor that only supports static PNG.
-            for (animated in booleanArrayOf(true, false)) {
-                val mime = if (animated) {
-                    Emoji3DShareStore.ANIMATED_MIME_TYPE
-                } else {
-                    Emoji3DShareStore.MIME_TYPE
-                }
-                if (!manager.appSupportsImageInsertion(mime, true)) continue
+            // Never send animation to a receiver that only advertises static PNG.
+            for (mime in preferredMimeTypes(useThreeD) {
+                manager.appSupportsImageInsertion(it, true)
+            }) {
+                val animated = mime == Emoji3DShareStore.ANIMATED_MIME_TYPE
 
                 val uri = try {
                     withContext(Dispatchers.IO) {
