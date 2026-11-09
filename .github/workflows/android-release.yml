@@ -86,7 +86,7 @@ jobs:
           path: |
             java/assets/emoji3d
             java/assets/emoji3d-share
-          key: fluent3d-static128-share256-lossless-v2-7a40f1a2d064d76e436813edc0f09b6c8cde5da8
+          key: fluent3d-static128-share256-lossless-v3-7a40f1a2d064d76e436813edc0f09b6c8cde5da8-${{ hashFiles('scripts/build_emoji3d_assets.py') }}
 
       - uses: actions/setup-python@v5
         if: steps.fluent3d-cache.outputs.cache-hit != 'true'
@@ -107,11 +107,11 @@ jobs:
           tar xzf "$RUNNER_TEMP/fluentui-emoji-3d.tar.gz" \
             -C "$FLUENT_DIR" --strip-components=1
           python -m pip install --disable-pip-version-check Pillow==11.3.0
-          python scripts/build_emoji3d_assets.py \
+          python -u scripts/build_emoji3d_assets.py \
             --source "$FLUENT_DIR/assets" \
             --dest java/assets/emoji3d \
             --share-dest java/assets/emoji3d-share \
-            --commit "$FLUENT_COMMIT"
+            --commit "$FLUENT_COMMIT" --jobs 4
           rm -f "$RUNNER_TEMP/fluentui-emoji-3d.tar.gz"
           rm -rf "$FLUENT_DIR"
 
@@ -141,7 +141,7 @@ jobs:
         id: fluent-motion-cache
         with:
           path: java/assets/emoji3d-motion
-          key: fluent3d-motion-lossless-webp256-gif256-v2-daa0365c09795789ed2bc6e8b228c97736cb6669
+          key: fluent3d-motion-lossless-webp256-gif256-v3-daa0365c09795789ed2bc6e8b228c97736cb6669-${{ hashFiles('scripts/build_emoji3d_motion.py') }}
 
       - uses: actions/setup-python@v5
         if: steps.fluent-motion-cache.outputs.cache-hit != 'true'
@@ -165,8 +165,8 @@ jobs:
             GIT_LFS_SKIP_SMUDGE=1 git checkout --detach "$MOTION_SHA"
             git lfs pull --include="$(python "$GITHUB_WORKSPACE/scripts/build_emoji3d_motion.py" --list-source-paths)" --exclude=""
           )
-          python scripts/build_emoji3d_motion.py \
-            --source "$MOTION_DIR" --dest java/assets/emoji3d-motion
+          python -u scripts/build_emoji3d_motion.py \
+            --source "$MOTION_DIR" --dest java/assets/emoji3d-motion --jobs 3
           rm -rf "$MOTION_DIR"
 
       - name: Verify genuine 256px RGBA WebP and GIF assets and MIT license
