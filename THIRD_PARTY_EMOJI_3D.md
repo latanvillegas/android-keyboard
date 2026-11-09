@@ -19,11 +19,15 @@ The images are pre-rendered 3D artwork. They are not interactive GLB meshes.
 Their original colors are preserved, without theme tinting, background
 discs or simulated per-cell 3D cards.
 
-The selected text and Unicode codepoints inserted into apps are unchanged.
+The selected Unicode sequence remains the fallback when the receiving editor
+does not support PNG insertion, the chosen asset is missing, the 3D setting is
+disabled, or the editor rejects the content request. Compatible editors can
+receive the same Fluent artwork as an image/png attachment through the private
+content provider. This does not change or replace the original Fluent artwork.
 For ASCII emoticons/kaomoji, the panel may show a semantically corresponding
-3D Fluent face while still inserting the exact original emoticon string.
-For codepoints without corresponding assets, Android's original Unicode
-rendering is used.
+3D Fluent face; the original ASCII string is retained for Unicode fallback.
+The receiving app controls whether an inserted image is displayed inline or
+as an attachment.
 
 MIT copyright notice: Copyright (c) Microsoft Corporation.
 
