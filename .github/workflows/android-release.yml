@@ -83,8 +83,10 @@ jobs:
       - uses: actions/cache@v4
         id: fluent3d-cache
         with:
-          path: java/assets/emoji3d
-          key: fluent3d-128px-webp88-v1-7a40f1a2d064d76e436813edc0f09b6c8cde5da8
+          path: |
+            java/assets/emoji3d
+            java/assets/emoji3d-share
+          key: fluent3d-static128-share256-lossless-v2-7a40f1a2d064d76e436813edc0f09b6c8cde5da8
 
       - uses: actions/setup-python@v5
         if: steps.fluent3d-cache.outputs.cache-hit != 'true'
@@ -108,6 +110,7 @@ jobs:
           python scripts/build_emoji3d_assets.py \
             --source "$FLUENT_DIR/assets" \
             --dest java/assets/emoji3d \
+            --share-dest java/assets/emoji3d-share \
             --commit "$FLUENT_COMMIT"
           rm -f "$RUNNER_TEMP/fluentui-emoji-3d.tar.gz"
           rm -rf "$FLUENT_DIR"
@@ -125,13 +128,20 @@ jobs:
           fi
           test -s java/assets/emoji3d/1f600.webp
           test -s java/assets/emoji3d/1f44d-1f3fb.webp
-          echo "3D Fluent emoji assets staged: $count"
+          test -s java/assets/emoji3d-share/LICENSE.txt
+          test -s java/assets/emoji3d-share/SOURCE.json
+          share_count="$(wc -l < java/assets/emoji3d-share/index.txt)"
+          test "$share_count" -eq "$count"
+          test -s java/assets/emoji3d-share/1f600.webp
+          test -s java/assets/emoji3d-share/1f44d-1f3fb.webp
+          du -h -s java/assets/emoji3d java/assets/emoji3d-share
+          echo "3D Fluent UI and lossless 256px share assets staged: $count"
 
       - uses: actions/cache@v4
         id: fluent-motion-cache
         with:
           path: java/assets/emoji3d-motion
-          key: fluent3d-motion-gif128-v1-daa0365c09795789ed2bc6e8b228c97736cb6669
+          key: fluent3d-motion-lossless-webp256-gif256-v2-daa0365c09795789ed2bc6e8b228c97736cb6669
 
       - uses: actions/setup-python@v5
         if: steps.fluent-motion-cache.outputs.cache-hit != 'true'
@@ -159,16 +169,20 @@ jobs:
             --source "$MOTION_DIR" --dest java/assets/emoji3d-motion
           rm -rf "$MOTION_DIR"
 
-      - name: Verify genuine animated Fluent GIF assets and MIT license
+      - name: Verify genuine 256px RGBA WebP and GIF assets and MIT license
         shell: bash
         run: |
           set -euo pipefail
           test -s java/assets/emoji3d-motion/LICENSE.txt
           test -s java/assets/emoji3d-motion/SOURCE.json
           test "$(wc -l < java/assets/emoji3d-motion/index.txt)" -eq 30
+          test -s java/assets/emoji3d-motion/1f600.webp
           test -s java/assets/emoji3d-motion/1f600.gif
+          test -s java/assets/emoji3d-motion/1f602.webp
           test -s java/assets/emoji3d-motion/1f602.gif
+          test -s java/assets/emoji3d-motion/1f62d.webp
           test -s java/assets/emoji3d-motion/1f62d.gif
+          du -h -s java/assets/emoji3d-motion
 
       - name: Configure production signing if secrets exist
         id: signing
@@ -265,12 +279,20 @@ jobs:
             | tee release-dist/emoji-3d-verification.txt
           unzip -p release-dist/futo-keyboard-stable-release.apk \
             assets/emoji3d/LICENSE.txt > release-dist/FLUENT_EMOJI_LICENSE.txt
+          share_count="$(unzip -p release-dist/futo-keyboard-stable-release.apk \
+            assets/emoji3d-share/index.txt | wc -l)"
+          test "$share_count" -eq "$asset_count"
+          unzip -p release-dist/futo-keyboard-stable-release.apk \
+            assets/emoji3d-share/LICENSE.txt > release-dist/FLUENT_EMOJI_HQ_LICENSE.txt
           gif_count="$(unzip -p release-dist/futo-keyboard-stable-release.apk \
             assets/emoji3d-motion/index.txt | wc -l)"
           if (( gif_count != 30 )); then
             echo "::error::APK has $gif_count animated Fluent assets; expected 30."
             exit 1
           fi
+          unzip -p release-dist/futo-keyboard-stable-release.apk \
+            assets/emoji3d-motion/1f600.webp | head -c 12 | \
+            python3 -c 'import sys; h=sys.stdin.buffer.read(); assert h[:4]==b"RIFF" and h[8:12]==b"WEBP"'
           unzip -p release-dist/futo-keyboard-stable-release.apk \
             assets/emoji3d-motion/LICENSE.txt > release-dist/FLUENT_EMOJI_ANIMATED_LICENSE.txt
           (cd release-dist && sha256sum futo-keyboard-stable-release.apk) \
@@ -283,6 +305,8 @@ jobs:
             "emoji3d=Microsoft Fluent Emoji prerendered 3D" \
             "emoji3d_source=shuding/fluentui-emoji-unicode@7a40f1a2d064d76e436813edc0f09b6c8cde5da8" \
             "emoji3d_count=$asset_count" \
+            "emoji3d_share_rgba_lossless_count=$share_count" \
+            "emoji3d_animated_webp=lossless-256px-RGBA" \
             "emoji3d_motion_source=microsoft/fluentui-emoji-animated@daa0365c09795789ed2bc6e8b228c97736cb6669" \
             "emoji3d_motion_count=30" \
             > release-dist/BUILD-INFO.txt
