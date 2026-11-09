@@ -49,6 +49,33 @@ class SmartEmojiTransportTest {
     )
 
     @Test
+    fun realAnimationIsPreferredBeforeStaticImage() {
+        val both = setOf("image/gif", "image/png")
+        assertEquals(
+            listOf("image/gif", "image/png"),
+            SmartEmojiTransport.preferredMimeTypes(true) { it in both }
+        )
+    }
+
+    @Test
+    fun pngOnlyEditorNeverReceivesAnimatedMimeType() {
+        assertEquals(
+            listOf("image/png"),
+            SmartEmojiTransport.preferredMimeTypes(true) { it == "image/png" }
+        )
+    }
+
+    @Test
+    fun disabledThreeDDoesNotQueryMultimediaCapabilities() {
+        var queries = 0
+        assertTrue(SmartEmojiTransport.preferredMimeTypes(false) {
+            queries++
+            true
+        }.isEmpty())
+        assertEquals(0, queries)
+    }
+
+    @Test
     fun disabledThreeDAlwaysInsertsUnicode() = runBlocking {
         val editor = FakeEditor().apply { pngSupported = true }
         val result = SmartEmojiTransport.send(editor.manager(), item(), false, editorToken)
