@@ -49,6 +49,32 @@ class SmartEmojiTransportTest {
     )
 
     @Test
+    fun losslessAnimatedWebpHasPriorityOverGifAndPng() {
+        val accepted = setOf("image/webp", "image/gif", "image/png")
+        assertEquals(
+            listOf("image/webp", "image/gif", "image/png"),
+            SmartEmojiTransport.preferredMimeTypes(true) { it in accepted }
+        )
+    }
+
+    @Test
+    fun webpOnlyEditorOffersOnlyAnimatedWebp() {
+        assertEquals(
+            listOf("image/webp"),
+            SmartEmojiTransport.preferredMimeTypes(true) { it == "image/webp" }
+        )
+    }
+
+    @Test
+    fun gifAndPngFallbackRemainInOrder() {
+        val accepted = setOf("image/gif", "image/png")
+        assertEquals(
+            listOf("image/gif", "image/png"),
+            SmartEmojiTransport.preferredMimeTypes(true) { it in accepted }
+        )
+    }
+
+    @Test
     fun realAnimationIsPreferredBeforeStaticImage() {
         val both = setOf("image/gif", "image/png")
         assertEquals(
