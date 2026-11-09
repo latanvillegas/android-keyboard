@@ -433,6 +433,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python -m pip install --disable-pip-version-check Pillow==11.3.0
           apk="$(find build/outputs/apk/stable/release -maxdepth 1 \
             -name '*.apk' -type f | head -n 1)"
           test -s "$apk"
