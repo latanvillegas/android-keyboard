@@ -38,7 +38,7 @@ internal object MediaPackImporter {
         }
     }
 
-    fun import(context: Context, uri: Uri): Int {
+    fun importPack(context: Context, uri: Uri): Int {
         if (uri.scheme != "content") throw IOException("Only content URIs supported")
         val input = context.contentResolver.openInputStream(uri)
             ?: throw IOException("Cannot open ZIP package")
