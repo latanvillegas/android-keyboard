@@ -9,7 +9,9 @@ Base: feature/fluent-emoji-3d-animated (PR #9, no master).
 - Importación mediante Android Storage Access Framework: PNG, JPEG, WebP, GIF y ZIP con imágenes.
 - Copia exacta de bytes originales a noBackupFilesDir/media-hub, fuera del APK y persistente entre actualizaciones; identificador de contenido SHA-256.
 - Detección del formato por cabeceras y validación de dimensiones: 4096 px por lado y 16,7 megapíxeles, 24 MiB por archivo, 500 archivos y cuota total de 512 MiB.
-- ZIP: solo imágenes en raíz o media/, máximo 200 entradas, 128 MiB comprimidos y 256 MiB importados. Sin extracción de rutas del ZIP al filesystem.
+- ZIP: solo imágenes en raíz o media/, máximo 600 entradas, 528 MiB comprimidos y 512 MiB expandidos. Sin extracción de rutas del ZIP al filesystem. Las entradas desconocidas también se consumen bajo un presupuesto de expansión para evitar ZIP bombs.
+- Exportación a formato ZIP portable con manifest versionado y archivos originales; la reimportación conserva nombres y favoritos.
+- Acceso directo a la gestión de modelos KeyboardLM offline ya existente en Ajustes → Modelos; NO ejecuta todavía LLM conversacionales genéricos.
 - Panel con filtros GIF, stickers y favoritos, miniaturas muestreadas, caché de memoria limitada a 8 MiB y borrado local.
 - ContentProvider privado de solo lectura y MIME originales: GIF, WebP, PNG y JPEG; envío protegido ante cambios de sesión de editor.
 - Editor estático sin Internet: imagen de origen + texto; exporta PNG de 512px sin sobrescribir el original.

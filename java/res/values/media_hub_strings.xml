@@ -3,6 +3,11 @@
     <string name="media_hub_title">Media Hub</string>
     <string name="media_import">Import</string>
     <string name="media_create">Create sticker</string>
+    <string name="media_export">Export ZIP</string>
+    <string name="media_export_success">Exported %1$d media files without quality loss</string>
+    <string name="media_export_failure">Cannot export media ZIP</string>
+    <string name="media_export_in_progress">Exporting your offline media pack…</string>
+    <string name="media_offline_models">Offline AI models</string>
     <string name="media_all">All</string>
     <string name="media_gifs">GIF</string>
     <string name="media_stickers">Stickers</string>

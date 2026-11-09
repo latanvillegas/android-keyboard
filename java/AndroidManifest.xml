@@ -108,6 +108,12 @@
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
 
         <activity
+            android:name=".uix.actions.media.MediaExportActivity"
+            android:label="@string/media_export"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+
+        <activity
             android:name=".uix.actions.media.StickerEditorActivity"
             android:label="@string/media_editor_title"
             android:exported="false"

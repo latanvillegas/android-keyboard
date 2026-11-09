@@ -96,6 +96,14 @@ private fun MediaHubPanel(manager: KeyboardManagerForAction) {
             }) {
                 Text(stringResource(R.string.media_create))
             }
+            Button(onClick = {
+                context.startActivity(
+                    Intent(context, MediaExportActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }) {
+                Text(stringResource(R.string.media_export))
+            }
         }
         Row(modifier = Modifier.fillMaxWidth()) {
             val filters = listOf(

@@ -3,6 +3,11 @@
     <string name="media_hub_title">Multimedia</string>
     <string name="media_import">Importar</string>
     <string name="media_create">Crear sticker</string>
+    <string name="media_export">Exportar ZIP</string>
+    <string name="media_export_success">Se exportaron %1$d archivos sin pérdida de calidad</string>
+    <string name="media_export_failure">No se pudo exportar el paquete ZIP</string>
+    <string name="media_export_in_progress">Exportando paquete multimedia local…</string>
+    <string name="media_offline_models">Modelos IA sin conexión</string>
     <string name="media_all">Todos</string>
     <string name="media_gifs">GIF</string>
     <string name="media_stickers">Stickers</string>
