@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="media_hub_title">Multimedia</string>
+    <string name="media_import">Importar</string>
+    <string name="media_create">Crear sticker</string>
+    <string name="media_all">Todos</string>
+    <string name="media_gifs">GIF</string>
+    <string name="media_stickers">Stickers</string>
+    <string name="media_favorites">Favoritos</string>
+    <string name="media_empty">Importa GIF, WebP, PNG, JPEG o un paquete ZIP de imágenes.</string>
+    <string name="media_unsupported">Esta aplicación no admite este formato multimedia.</string>
+    <string name="media_missing">El archivo multimedia ya no está disponible.</string>
+    <string name="media_import_success">Se importaron %1$d elementos</string>
+    <string name="media_import_partial">Se importaron %1$d elementos; fallaron %2$d archivos</string>
+    <string name="media_import_empty">No se encontraron archivos compatibles</string>
+    <string name="media_import_in_progress">Importando archivos a la biblioteca local…</string>
+    <string name="media_editor_title">Crear sticker sin conexión</string>
+    <string name="media_choose_photo">Elegir imagen</string>
+    <string name="media_editor_caption">Texto del sticker</string>
+    <string name="media_save_sticker">Guardar sticker PNG transparente</string>
+    <string name="media_sticker_saved">Sticker guardado en Multimedia</string>
+</resources>
