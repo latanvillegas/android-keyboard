@@ -1,70 +1,110 @@
-# Adaptive Fluent Emoji 3D transport
+# High-fidelity real Fluent Emoji 3D animation and adaptive transport
 
-## Contract
+## User-visible behavior
 
-The emoji picker continues to display the existing prerendered Fluent 3D
-WebP assets when the relief setting is enabled. No new artwork is generated.
+The keyboard still displays its existing lightweight Fluent 3D previews.
+The receiving app, not the keyboard preview, determines how attached media
+are presented and whether animations play.
 
-Selecting an emoji uses one ordered output path:
+Each tap is processed in order and offered to the currently focused Android
+editor in this priority:
 
-1. Capture the base editor session (input connection + EditorInfo identity).
-2. When 3D is disabled, or the editor does not advertise `image/png`, insert
-   the original Unicode string (ASCII emoticons retain whitespace handling).
-3. When 3D is enabled and PNG is advertised, resolve the same Fluent asset
-   used by the picker, prepare a transparent PNG in the private cache on
-   Dispatchers.IO and offer a read-only `content://` URI to the editor.
-4. If the artwork does not exist, PNG preparation fails or the editor explicitly
-   rejects `commitContent`, insert the original Unicode string once.
-5. If `commitContent` returns true, do **not** insert any Unicode fallback.
-6. If the editor session changes while preparing the PNG, do not insert
-   anything into the newly focused editor.
+1. **Animated WebP** (`image/webp`) when advertised and bundled: genuine
+   Microsoft Fluent APNG motion encoded losslessly at **up to 256 x 256 px**,
+   **24-bit RGB + 8-bit alpha (RGBA)**.
+2. **GIF** (`image/gif`) when Animated WebP is unavailable or rejected:
+   genuine Fluent frame-by-frame motion, up to **256 x 256 px**. The format's
+   inherent per-frame palette of at most 256 colors can reduce fidelity.
+3. **Static PNG** (`image/png`): a lossless PNG generated from a separate
+   **256 x 256 px lossless RGBA Fluent WebP** sharing master, for every emoji
+   covered by the official static 3D catalog.
+4. **Unicode/ASCII**: the original exact selected character or emoticon when
+   rich content cannot be offered.
 
-Image insertion may appear as an attachment or preview instead of an inline
-text glyph, depending on the receiving application. A true `commitContent`
-return value means the editor accepted the content request; it does **not**
-prove that a message was transmitted or delivered.
+If the 3D relief setting is disabled, the keyboard directly inserts original
+Unicode. If any graphic is missing, the cascade falls back automatically;
+a missing skin tone or ZWJ variant is never silently substituted with a
+different Unicode sequence. A mutex preserves tap order and an editor session
+token blocks output into a newly focused input field.
 
-## Storage and permissions
+Important: Android `commitContent() == true` confirms that the editor
+accepted the MIME/URI **request**, not that the receiving chat delivered the
+message. Some apps display media as an attachment requiring a send press,
+flatten animated WebP to a static image, resize it, or recompress it. MIME
+declaration alone cannot guarantee that motion or pixel fidelity survives.
+True 3D interactive models require receiving-app support not supplied by the
+Android emoji standard.
 
-- The provider uses `${applicationId}.emoji3d`, `exported=false` and
-  `grantUriPermissions=true`. The existing `typeUri` path grants
-  `FLAG_GRANT_READ_URI_PERMISSION` to the editor's package.
-- PNGs are addressed by SHA-256 of the resolved asset key, never by a
-  caller-controlled file path. The provider checks URI authority, scheme,
-  path and fixed-length hex identifier.
-- Output creation is atomic (temporary file, then rename), and serialized.
-- Individual PNG output is limited to 8 MiB; the on-demand cache targets
-  64 MiB and expires unused files after 24 hours. Recently shared files are
-  retained for at least ten minutes to allow asynchronous reads.
-- No network requests or external storage access are needed.
+## Sources and reproducibility
 
-## Manual Android integration matrix
+The assets are generated during the APK build, never downloaded by the
+installed keyboard.
 
-| Test | Expected behavior |
+### Static 3D catalog
+
+- Source: `shuding/fluentui-emoji-unicode` (original Microsoft Fluent 3D,
+  MIT license), commit
+  `7a40f1a2d064d76e436813edc0f09b6c8cde5da8`.
+- `scripts/build_emoji3d_assets.py` creates **two independent catalogs**:
+  `assets/emoji3d/` uses the original 128px WebP quality 88 for scrolling
+  performance; `assets/emoji3d-share/` contains full RGBA lossless 256px
+  WebP of the same Unicode artwork to generate PNG shares.
+- The high-resolution sharing decoder does not expand the 16 MiB UI
+  scrolling-cache budget. Android decodes high-resolution only when needed.
+- The build includes an index, manifest and full MIT license in both folders.
+
+### Genuine animated 3D catalog
+
+- Source: `microsoft/fluentui-emoji-animated`, MIT license, immutable
+  commit `daa0365c09795789ed2bc6e8b228c97736cb6669`.
+- 30 selected real motion sequences from the **original APNG frames** are
+  obtained via selective Git LFS checkout, not the multi-gigabyte repository.
+- `scripts/build_emoji3d_motion.py` decodes the composited original frames
+  and preserves total animation duration. It can retain up to **96 source
+  frames** in lossless 256px Animated WebP and up to **48 in GIF**.
+- Each GIF is derived from the original RGBA sequence rather than re-encoding
+  already palettized GIF frames.
+- Both variants are indexed by the exact Unicode metadata supplied by
+  Microsoft. `SOURCE.json` records counts, frame totals, byte sizes and
+  upstream SHA-256 hashes.
+- Animated WebP is not a different static emoji, a screen transform, or an
+  interactive 3D mesh: it carries actual prerendered facial/gesture motion.
+
+## Security and resource bounds
+
+- The provider is `exported=false`, grants URI read permission to the
+  focused editor, and validates the URI scheme, authority, token, suffix,
+  media signature and read-only mode.
+- Allowed MIME types: `image/webp`, `image/gif`, `image/png`.
+- Files are created atomically in private cache using names derived from
+  SHA-256 of the artwork ID, format, and cache version.
+- Each shared file is limited to 16 MiB; cache eviction targets 64 MiB and
+  preserves recently shared resources for at least 10 minutes. Older files
+  expire after 24 hours.
+- All decoding and file copies execute on `Dispatchers.IO`; no network
+  dependencies are required during keyboard operation.
+
+## Validation matrix (Android devices)
+
+| Receiver reports | Expected attempt order |
 | --- | --- |
-| 3D on; editor advertises image/png; asset present; commit accepted | One PNG insertion; no Unicode duplicate |
-| 3D on; editor advertises image/png; asset present; commit rejected | One Unicode insertion |
-| 3D on; editor has no image MIME capability | One Unicode insertion |
-| 3D on; Fluent asset missing | One Unicode insertion |
-| 3D off; any editor | Original Unicode/ASCII behavior |
-| Skin-tone or ZWJ variant with artwork | Exact variant exported; never replace with default skin tone |
-| Skin-tone or ZWJ variant without artwork | Exact selected Unicode sequence |
-| Switch app/field while PNG is rendering | No insertion in newly focused editor |
-| Rapid tapping of 20 emojis | Each tap handled once, in queue order |
-| Repeated image selection | Reuse prepared PNG without unbounded duplicate files |
-| Editor opens content URI after returning true | Provider exposes complete, readable image/png |
-| Editor rejects or throws | No uncaught exception, Unicode fallback |
-| Image receiver does not render as inline emoji | May appear as attachment; design remains intact |
+| image/webp, image/gif, image/png | WebP -> GIF -> PNG -> Unicode |
+| image/gif and image/png | GIF -> PNG -> Unicode |
+| image/png only | PNG -> Unicode |
+| image/webp only | WebP -> Unicode |
+| no image MIME support | Unicode/ASCII |
+| missing animation | High-resolution PNG if available |
+| stale editor session | Do not write to the replacement editor |
+| 3D disabled | Unicode/ASCII only |
 
-JVM unit tests cover disabled 3D, unsupported editors, stale sessions, ASCII
-fallback and repeated/concurrent Unicode inserts. Full image commit behavior
-must be verified on devices using actual messaging applications; the emulator
-cannot establish compatibility for third-party apps.
+Automation checks actual 256px output, transparent alpha, multiple distinct
+frames and valid MIME containers for all 30 animations; JVM tests confirm MIME
+priority and fallback. The preview CI compiles Stable Release with the
+full static/share/animated catalogs, checks the signature and APK contents,
+and produces a development-signed testing artifact.
 
-## Validation before merging
-
-Run the existing project's Gradle unit-test and Stable Release compilation
-pipeline, including packaging of the pinned Fluent asset source, then perform
-the Android integration matrix on devices. Do not merge based solely on
-`commitContent` returning true or the appearance of an image inside the
-keyboard picker.
+Before merging, test real outbound and received messages in WhatsApp,
+Telegram, Signal and Google Messages: verify actual animation playback,
+attachment sending flow, color detail and transparency, not merely that
+the sender accepted the content URI. A provider cannot override a
+third-party app's media recompression.

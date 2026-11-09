@@ -1,0 +1,321 @@
+name: Build FUTO lossless 3D RGBA animated emoji preview APK
+
+on:
+  pull_request:
+    paths:
+      - "java/**"
+      - "scripts/build_emoji3d_motion.py"
+      - "scripts/build_emoji3d_assets.py"
+      - "tests/unit/**"
+      - ".github/workflows/emoji3d-motion-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Keep image asset generation independent: generated caches are durable even
+# when a newer commit supersedes an old APK build. Only APK jobs are cancelled.
+jobs:
+  static-assets:
+    name: Produce/cache 256px lossless RGBA static artwork
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+          lfs: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/cache@v4
+        id: static-cache
+        with:
+          path: |
+            java/assets/emoji3d
+            java/assets/emoji3d-share
+          key: fluent3d-static128-share256-lossless-v3-7a40f1a2d064d76e436813edc0f09b6c8cde5da8-${{ hashFiles('scripts/build_emoji3d_assets.py') }}
+
+      - name: Fetch and package all static artwork only on a cache miss
+        if: steps.static-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check Pillow==11.3.0
+          STATIC_SHA=7a40f1a2d064d76e436813edc0f09b6c8cde5da8
+          STATIC_DIR="$RUNNER_TEMP/fluentui-emoji-unicode"
+          mkdir -p "$STATIC_DIR"
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 900 \
+            "https://codeload.github.com/shuding/fluentui-emoji-unicode/tar.gz/$STATIC_SHA" \
+            -o "$RUNNER_TEMP/fluent-static.tar.gz"
+          tar xzf "$RUNNER_TEMP/fluent-static.tar.gz" -C "$STATIC_DIR" \
+            --strip-components=1
+          python -u scripts/build_emoji3d_assets.py \
+            --source "$STATIC_DIR/assets" --dest java/assets/emoji3d \
+            --share-dest java/assets/emoji3d-share --commit "$STATIC_SHA" \
+            --jobs 4
+
+      - name: Validate complete static catalogs before caching
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s java/assets/emoji3d/LICENSE.txt
+          test -s java/assets/emoji3d-share/LICENSE.txt
+          ui_count="$(wc -l < java/assets/emoji3d/index.txt)"
+          share_count="$(wc -l < java/assets/emoji3d-share/index.txt)"
+          test "$ui_count" -ge 2500
+          test "$ui_count" -eq "$share_count"
+          diff -q java/assets/emoji3d/index.txt \
+            java/assets/emoji3d-share/index.txt
+          test -s java/assets/emoji3d-share/1f600.webp
+          test -s java/assets/emoji3d-share/1f44d-1f3fb.webp
+          echo "Verified $share_count high-fidelity lossless RGBA masters"
+          du -h -s java/assets/emoji3d java/assets/emoji3d-share
+
+  motion-assets:
+    name: Produce/cache 30 genuine 256px lossless animations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+          lfs: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/cache@v4
+        id: motion-cache
+        with:
+          path: java/assets/emoji3d-motion
+          key: fluent3d-motion-lossless-webp256-gif256-v3-daa0365c09795789ed2bc6e8b228c97736cb6669-${{ hashFiles('scripts/build_emoji3d_motion.py') }}
+
+      - name: Install pinned image converter on a cache miss
+        if: steps.motion-cache.outputs.cache-hit != 'true'
+        run: python -m pip install --disable-pip-version-check Pillow==11.3.0
+
+      - name: Fetch only original Microsoft motion via Git LFS
+        if: steps.motion-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git lfs version
+          MOTION_SHA=daa0365c09795789ed2bc6e8b228c97736cb6669
+          MOTION_DIR="$RUNNER_TEMP/fluentui-emoji-animated"
+          GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 --filter=blob:none \
+            --no-checkout https://github.com/microsoft/fluentui-emoji-animated.git \
+            "$MOTION_DIR"
+          (
+            cd "$MOTION_DIR"
+            git -c protocol.version=2 fetch --depth 1 origin "$MOTION_SHA"
+            GIT_LFS_SKIP_SMUDGE=1 git checkout --detach "$MOTION_SHA"
+            echo "Downloading curated original APNGs..."
+            timeout 1200 git lfs pull \
+              --include="$(python "$GITHUB_WORKSPACE/scripts/build_emoji3d_motion.py" --list-source-paths)" \
+              --exclude=""
+          )
+          echo "Original APNGs ready:"
+          du -h -s "$MOTION_DIR/assets"
+
+      - name: Render and verify 30 full-color animations in parallel
+        if: steps.motion-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -u scripts/build_emoji3d_motion.py \
+            --source "$RUNNER_TEMP/fluentui-emoji-animated" \
+            --dest java/assets/emoji3d-motion --jobs 3
+
+      - name: Validate animation catalog before caching
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s java/assets/emoji3d-motion/LICENSE.txt
+          test -s java/assets/emoji3d-motion/SOURCE.json
+          test "$(wc -l < java/assets/emoji3d-motion/index.txt)" -eq 30
+          while IFS= read -r key; do
+            test -s "java/assets/emoji3d-motion/$key.webp"
+            test -s "java/assets/emoji3d-motion/$key.gif"
+          done < java/assets/emoji3d-motion/index.txt
+          echo "Verified 30 animated RGBA WebP + GIF pairs"
+          du -h -s java/assets/emoji3d-motion
+
+  animated-preview:
+    name: Compile, sign and inspect complete Stable Release preview
+    needs: [static-assets, motion-assets]
+    concurrency:
+      group: fluent-emoji-hq-apk-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          lfs: false
+
+      - name: Restore validated static RGB/A catalog (no re-encoding)
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            java/assets/emoji3d
+            java/assets/emoji3d-share
+          key: fluent3d-static128-share256-lossless-v3-7a40f1a2d064d76e436813edc0f09b6c8cde5da8-${{ hashFiles('scripts/build_emoji3d_assets.py') }}
+          fail-on-cache-miss: true
+
+      - name: Restore validated motion catalog (no re-encoding)
+        uses: actions/cache/restore@v4
+        with:
+          path: java/assets/emoji3d-motion
+          key: fluent3d-motion-lossless-webp256-gif256-v3-daa0365c09795789ed2bc6e8b228c97736cb6669-${{ hashFiles('scripts/build_emoji3d_motion.py') }}
+          fail-on-cache-miss: true
+
+      - name: Validate restored assets before Android setup
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(wc -l < java/assets/emoji3d-motion/index.txt)" -eq 30
+          test "$(wc -l < java/assets/emoji3d/index.txt)" -ge 2500
+          cmp java/assets/emoji3d/index.txt java/assets/emoji3d-share/index.txt
+          test -s java/assets/emoji3d-motion/1f600.webp
+          test -s java/assets/emoji3d-motion/1f600.gif
+          test -s java/assets/emoji3d-share/1f600.webp
+
+      - name: Fetch pinned Android project submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule sync --recursive
+          git -c protocol.version=2 submodule update --init --depth 1 --jobs 4 -- \
+            libs translations java/assets/layouts java/assets/themes java/res-large \
+            voiceinput-shared/src/main/ml
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install SDK, NDK and CMake
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install \
+            "platforms;android-35" "build-tools;35.0.0" \
+            "ndk;28.2.13676358" "cmake;3.22.1"
+
+      # Pull request jobs normally restore only. Allow write-back so subsequent
+      # commits in this PR reuse Gradle task outputs and the local build cache.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run JVM regressions and assemble full APK
+        shell: bash
+        env:
+          VERSION_NAME: emoji3d-motion-preview
+          VERSION_CODE: "900002"
+          BRANCH_NAME: master
+        run: |
+          set -euo pipefail
+          test -f java/shared.keystore
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace --build-cache --warning-mode summary \
+            testStableReleaseUnitTest assembleStableRelease
+
+      - name: Verify all original Fluent files INSIDE signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check Pillow==11.3.0
+          mkdir -p preview-dist
+          apk="$(find build/outputs/apk/stable/release -maxdepth 1 \
+            -type f -name '*.apk' | head -n 1)"
+          test -n "$apk" && test -s "$apk"
+          cp "$apk" preview-dist/futo-keyboard-fluent-3d-animated-preview.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose \
+            preview-dist/futo-keyboard-fluent-3d-animated-preview.apk \
+            > preview-dist/signature-verification.txt
+          unzip -t preview-dist/futo-keyboard-fluent-3d-animated-preview.apk \
+            > preview-dist/zip-integrity.txt
+          python - <<'PY'
+          import io
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile
+          from PIL import Image
+
+          apk = Path("preview-dist/futo-keyboard-fluent-3d-animated-preview.apk")
+          with ZipFile(apk) as archive:
+              names = set(archive.namelist())
+              def keys(folder):
+                  return archive.read(f"assets/{folder}/index.txt").decode().splitlines()
+
+              ui = keys("emoji3d")
+              share = keys("emoji3d-share")
+              motion = keys("emoji3d-motion")
+              assert len(ui) >= 2500 and ui == share
+              assert len(motion) == 30
+              for key in ui:
+                  assert f"assets/emoji3d/{key}.webp" in names
+                  assert f"assets/emoji3d-share/{key}.webp" in names
+
+              for key in motion:
+                  for extension in ("webp", "gif"):
+                      member = f"assets/emoji3d-motion/{key}.{extension}"
+                      with Image.open(io.BytesIO(archive.read(member))) as im:
+                          assert im.size == (256, 256), member
+                          assert im.n_frames >= 2, member
+                          assert im.format == extension.upper(), member
+
+              with Image.open(io.BytesIO(
+                  archive.read("assets/emoji3d-share/1f600.webp")
+              )) as still:
+                  assert still.size == (256, 256)
+                  assert still.getchannel("A").getextrema()[0] < 255
+              details = json.loads(
+                  archive.read("assets/emoji3d-share/SOURCE.json")
+              )
+              assert "lossless" in details["format"].lower()
+              for folder in ("emoji3d", "emoji3d-share", "emoji3d-motion"):
+                  assert f"assets/{folder}/LICENSE.txt" in names
+
+              print(f"APK verified: {len(ui)} static picker images, "
+                    f"{len(share)} 256px lossless sharing masters, "
+                    f"{len(motion)} genuine animated WebP/GIF pairs.")
+          PY
+          unzip -p preview-dist/futo-keyboard-fluent-3d-animated-preview.apk \
+            assets/emoji3d-motion/LICENSE.txt > preview-dist/FLUENT_ANIMATED_MIT_LICENSE.txt
+          unzip -p preview-dist/futo-keyboard-fluent-3d-animated-preview.apk \
+            assets/emoji3d-share/LICENSE.txt > preview-dist/FLUENT_HQ_MIT_LICENSE.txt
+          (cd preview-dist && sha256sum futo-keyboard-fluent-3d-animated-preview.apk) \
+            > preview-dist/SHA256SUMS
+          printf '%s\n' \
+            "Source commit: $GITHUB_SHA" \
+            "Static 3D picker and share assets: $(wc -l < java/assets/emoji3d/index.txt)" \
+            "Genuine animated 3D assets: 30 lossless WebP + 30 GIF" \
+            "Signing: DEVELOPMENT key (not a production update)" \
+            "GitHub Actions run: $GITHUB_RUN_ID" \
+            > preview-dist/BUILD-INFO.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: futo-keyboard-fluent-3d-motion-preview
+          path: preview-dist/
+          if-no-files-found: error
+          retention-days: 30

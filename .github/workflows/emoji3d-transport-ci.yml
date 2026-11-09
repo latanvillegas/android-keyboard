@@ -56,7 +56,10 @@ jobs:
             "ndk;28.2.13676358" \
             "cmake;3.22.1"
 
+      # Reuse successful compilations in later PR revisions.
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
       - name: Run unit regression suite and compile source
         shell: bash
@@ -67,5 +70,5 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x gradlew
-          ./gradlew --no-daemon --stacktrace --warning-mode summary \
+          ./gradlew --no-daemon --stacktrace --build-cache --warning-mode summary \
             testStableReleaseUnitTest
