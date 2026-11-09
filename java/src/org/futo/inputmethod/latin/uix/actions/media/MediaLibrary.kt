@@ -174,7 +174,15 @@ internal object MediaLibrary {
                         digest.update(chunk, 0, count)
                     }
                 }
-                val header = FileInputStream(staging).use { it.readNBytes(16) }
+                val header = ByteArray(16)
+                FileInputStream(staging).use { stream ->
+                    var filled = 0
+                    while (filled < header.size) {
+                        val read = stream.read(header, filled, header.size - filled)
+                        if (read < 0) break
+                        filled += read
+                    }
+                }
                 val kind = MediaMagic.detect(header)
                     ?: throw IOException("Only genuine PNG, JPEG, GIF and WebP images are supported")
 

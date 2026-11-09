@@ -119,6 +119,7 @@ import org.futo.inputmethod.latin.uix.actions.emoji.EmojiItem
 import org.futo.inputmethod.latin.uix.actions.emoji.EmojiView
 import org.futo.inputmethod.latin.uix.actions.emoji.FluentEmoji3DImage
 import org.futo.inputmethod.latin.uix.actions.emoji.SmartEmojiTransport
+import org.futo.inputmethod.latin.uix.actions.media.MediaHubAction
 import org.futo.inputmethod.latin.uix.settings.useDataStore
 import org.futo.inputmethod.latin.uix.settings.useDataStoreValue
 import org.futo.inputmethod.latin.uix.theme.LocalCompatEmojiFamily
@@ -1270,6 +1271,11 @@ val EmojiAction = Action(
                                         .align(Alignment.CenterVertically))
                             }
                         }
+                    }
+
+                    IconButton(onClick = { manager.activateAction(MediaHubAction) }) {
+                        Icon(painterResource(id = R.drawable.smile),
+                            contentDescription = stringResource(R.string.media_hub_title))
                     }
 
                     IconButton(onClick = {
