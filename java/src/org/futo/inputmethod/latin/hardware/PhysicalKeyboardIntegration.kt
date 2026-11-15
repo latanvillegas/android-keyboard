@@ -69,7 +69,7 @@ internal object PhysicalKeyboardPrefs {
 internal object PhysicalKeyboardDetector {
     fun names(context: Context): List<String> {
         val manager = context.getSystemService(Context.INPUT_SERVICE) as InputManager
-        val devices = manager.inputDeviceIds.mapNotNull { manager.getInputDevice(it) }
+        val devices = manager.inputDeviceIds.toList().mapNotNull { deviceId -> manager.getInputDevice(deviceId) }
             .filter {
                 !it.isVirtual &&
                     it.keyboardType == InputDevice.KEYBOARD_TYPE_ALPHABETIC &&
