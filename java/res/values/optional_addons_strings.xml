@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="addons_media_title">Multimedia, GIF and stickers</string>
+    <string name="addons_media_description">Import GIFs, images and ZIP collections; create stickers and edit animated GIFs offline</string>
+    <string name="addons_fluent_title">External Fluent 3D emojis</string>
+    <string name="addons_fluent_description">Install or remove the optional Fluent 3D collection without embedding it into the APK</string>
+    <string name="addons_models_title">Manage offline FUTO models</string>
+    <string name="addons_models_description">Choose or import compatible FUTO prediction models</string>
+    <string name="addons_ai_title">Offline AI assistant and external model</string>
+    <string name="addons_ai_description">Configure the separately installed AI runtime and a compatible MediaPipe .task model</string>
+    <string name="addons_actions_title">Customize multimedia and AI actions</string>
+    <string name="addons_actions_description">Choose and rearrange the configurable keyboard action shortcuts</string>
+    <string name="addons_import_manual">Import manually from file</string>
+    <string name="addons_download_title">Download a compatible file</string>
+    <string name="addons_download_instruction">Open the link in your browser, save a supported file, then return and choose Import manually. Downloads are never performed automatically by the keyboard.</string>
+    <string name="addons_link_label">Editable HTTPS download/catalogue URL</string>
+    <string name="addons_open_download">Open download link</string>
+    <string name="addons_restore_link">Reset URL</string>
+    <string name="addons_https_required">Enter a valid HTTPS link without a username or password.</string>
+    <string name="addons_open_failed">Cannot open the selected application or link.</string>
+    <string name="addons_media_hint">GIF, PNG, JPEG, WebP and supported image ZIPs can be imported. Downloaded files remain in private local storage.</string>
+    <string name="addons_fluent_source_notice">The default link points to a temporary historical GitHub Actions artifact. Download the artifact ZIP, extract fluent3d-full-offline-collection.zip and import that inner ZIP only. Change the link if the artifact expires. The Microsoft source repository ZIP is not directly installable.</string>
+    <string name="addons_ai_source_notice">MediaPipe .task models are different from FUTO KeyboardLM GGUF models. The optional runtime APK must be separately installed and signed with the same certificate as FUTO. This link opens documentation, not a prevalidated model download.</string>
+    <string name="addons_runtime_source">View external AI runtime source code</string>
+    <string name="addons_removed">External Fluent 3D collection removed.</string>
+    <string name="addons_remove_failed">Could not remove the external Fluent 3D collection.</string>
+</resources>

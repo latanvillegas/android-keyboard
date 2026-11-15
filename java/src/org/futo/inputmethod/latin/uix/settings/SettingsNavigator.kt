@@ -41,6 +41,8 @@ import org.futo.inputmethod.latin.uix.settings.pages.HomeScreen
 import org.futo.inputmethod.latin.uix.settings.pages.HomeScreenLite
 import org.futo.inputmethod.latin.uix.settings.pages.KASROZMenu
 import org.futo.inputmethod.latin.uix.settings.pages.KeyboardAndTypingScreen
+import org.futo.inputmethod.latin.uix.settings.pages.AddonKind
+import org.futo.inputmethod.latin.uix.settings.pages.OptionalAddonScreen
 import org.futo.inputmethod.latin.hardware.PhysicalKeyboardSettingsScreen
 import org.futo.inputmethod.latin.uix.settings.pages.KeyboardSettingsMenu
 import org.futo.inputmethod.latin.uix.settings.pages.LanguageSettingsLite
@@ -172,6 +174,9 @@ fun SettingsNavigator(
             }
             composable("keyboardAndTyping") { KeyboardAndTypingScreen(navController) }
             composable("physicalKeyboard") { PhysicalKeyboardSettingsScreen(navController) }
+            composable("addonMedia") { OptionalAddonScreen(navController, AddonKind.MEDIA) }
+            composable("addonFluent") { OptionalAddonScreen(navController, AddonKind.FLUENT) }
+            composable("addonAi") { OptionalAddonScreen(navController, AddonKind.AI) }
             composable("resize") { ResizeScreen(navController) }
             composable("themes") { ThemeScreen(navController) }
             composable("developer") { DeveloperScreen(navController) }
