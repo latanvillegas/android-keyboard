@@ -905,6 +905,13 @@ val KeyboardSettingsMenu = UserSettingsMenu(
         userSettingToggleDataStore(
             title = R.string.keyboard_settings_hide_when_hardware_keyboard_is_connected,
             setting = HideKeyboardWhenHardKeyboardConnected
+        ),
+        userSettingNavigationItem(
+            title = R.string.hardware_keyboard_settings_title,
+            subtitle = R.string.hardware_keyboard_settings_summary,
+            style = NavigationItemStyle.Misc,
+            navigateTo = "physicalKeyboard",
+            icon = R.drawable.keyboard
         )
     )
 )

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hardware_keyboard_settings_title">Physical keyboard and PC mode</string>
+    <string name="hardware_keyboard_settings_summary">Detection, visibility and Lenovo/Enkore compatibility</string>
+    <string name="hardware_keyboard_connected">Connected</string>
+    <string name="hardware_keyboard_disconnected">No physical alphabetic keyboard detected</string>
+    <string name="hardware_keyboard_visibility_title">On-screen keyboard visibility</string>
+    <string name="hardware_keyboard_mode_system">System: keep FUTO/Android behavior</string>
+    <string name="hardware_keyboard_mode_always">Always show the on-screen keyboard</string>
+    <string name="hardware_keyboard_mode_hide">Hide when a physical keyboard is connected</string>
+    <string name="hardware_keyboard_mode_manual">Manual: choose Show or Hide</string>
+    <string name="hardware_keyboard_manual_on">Manual selection: visible</string>
+    <string name="hardware_keyboard_manual_off">Manual selection: hidden while connected</string>
+    <string name="hardware_keyboard_show">Show</string>
+    <string name="hardware_keyboard_hide">Hide</string>
+    <string name="hardware_keyboard_mapping_notice">Android controls Lenovo PC mode, Enkore Excel, USB and Bluetooth layouts and keyboard shortcuts. Configure Spanish/AltGr and keyboard layout in Android physical keyboard settings. Some Fn keys are handled by firmware.</string>
+</resources>

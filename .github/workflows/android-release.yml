@@ -2,7 +2,7 @@ name: Build FUTO Stable Release APK
 
 on:
   push:
-    branches: [master]
+    branches: [master, feature/fluent3d-optional-hq-pack-lite-apk]
     paths:
       - ".github/workflows/android-release.yml"
       - "java/**"

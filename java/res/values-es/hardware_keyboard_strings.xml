@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hardware_keyboard_settings_title">Teclado físico y modo PC</string>
+    <string name="hardware_keyboard_settings_summary">Detección, visibilidad y compatibilidad Lenovo/Enkore</string>
+    <string name="hardware_keyboard_connected">Conectado</string>
+    <string name="hardware_keyboard_disconnected">No se detecta un teclado físico alfabético</string>
+    <string name="hardware_keyboard_visibility_title">Visibilidad del teclado virtual</string>
+    <string name="hardware_keyboard_mode_system">Sistema: conservar el comportamiento de FUTO/Android</string>
+    <string name="hardware_keyboard_mode_always">Mostrar siempre el teclado virtual</string>
+    <string name="hardware_keyboard_mode_hide">Ocultar cuando se conecte un teclado físico</string>
+    <string name="hardware_keyboard_mode_manual">Manual: elegir Mostrar u Ocultar</string>
+    <string name="hardware_keyboard_manual_on">Selección manual: visible</string>
+    <string name="hardware_keyboard_manual_off">Selección manual: oculto mientras esté conectado</string>
+    <string name="hardware_keyboard_show">Mostrar</string>
+    <string name="hardware_keyboard_hide">Ocultar</string>
+    <string name="hardware_keyboard_mapping_notice">Android controla los atajos y distribuciones Lenovo Modo PC, Enkore Excel, USB y Bluetooth. Configura español/AltGr y la distribución en los ajustes de teclado físico de Android. Algunas teclas Fn se procesan en el firmware.</string>
+</resources>
