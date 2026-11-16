@@ -276,6 +276,23 @@ class UixActionKeyboardManager(val uixManager: UixManager, val latinIME: LatinIM
         return latinIME
     }
 
+    override fun isSensitiveInputField(): Boolean {
+        val info = latinIME.getBaseInputEditorInfo() ?: return false
+        val type = info.inputType
+        val kind = type and android.text.InputType.TYPE_MASK_CLASS
+        val variation = type and android.text.InputType.TYPE_MASK_VARIATION
+        val password = kind == android.text.InputType.TYPE_CLASS_TEXT && (
+            variation == android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+            variation == android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+            variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
+        )
+        val pin = kind == android.text.InputType.TYPE_CLASS_NUMBER &&
+            variation == android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        val privateEditor = (info.imeOptions and
+            android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
+        return password || pin || privateEditor
+    }
+
     override fun getLifecycleScope(): LifecycleCoroutineScope {
         return latinIME.lifecycleScope
     }

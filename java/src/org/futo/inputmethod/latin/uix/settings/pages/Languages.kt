@@ -546,6 +546,36 @@ val LanguageSettingsBottom = listOf(
                 true
             )
         },
+    ),
+    userSettingNavigationItem(
+        title = R.string.addons_media_title,
+        subtitle = R.string.addons_media_description,
+        style = NavigationItemStyle.Misc,
+        navigateTo = "addonMedia",
+    ),
+    userSettingNavigationItem(
+        title = R.string.addons_fluent_title,
+        subtitle = R.string.addons_fluent_description,
+        style = NavigationItemStyle.Misc,
+        navigateTo = "addonFluent",
+    ),
+    userSettingNavigationItem(
+        title = R.string.addons_models_title,
+        subtitle = R.string.addons_models_description,
+        style = NavigationItemStyle.Misc,
+        navigateTo = "models",
+    ),
+    userSettingNavigationItem(
+        title = R.string.addons_ai_title,
+        subtitle = R.string.addons_ai_description,
+        style = NavigationItemStyle.Misc,
+        navigateTo = "addonAi",
+    ),
+    userSettingNavigationItem(
+        title = R.string.addons_actions_title,
+        subtitle = R.string.addons_actions_description,
+        style = NavigationItemStyle.Misc,
+        navigateTo = "actionEdit",
     )
 )
 

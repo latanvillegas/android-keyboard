@@ -1,6 +1,11 @@
 package org.futo.inputmethod.latin.uix.settings.pages
 
 import androidx.compose.foundation.layout.Column
+import org.futo.inputmethod.latin.uix.AiQuickButtonAppearanceSetting
+import org.futo.inputmethod.latin.uix.AiQuickButtonVisibleSetting
+import org.futo.inputmethod.latin.uix.settings.DropDownPickerSettingItem
+import org.futo.inputmethod.latin.uix.settings.useDataStore
+import org.futo.inputmethod.latin.uix.settings.userSettingToggleDataStore
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -148,7 +153,31 @@ val ActionsScreen = UserSettingsMenu(
             )
         },
 
-        // TODO: Add a "Show voice input button" toggle
+        // Theme-following by default; independent overrides for IA only.
+        userSettingToggleDataStore(
+            title = R.string.ai_quick_button_visible,
+            subtitle = R.string.ai_quick_button_visible_description,
+            setting = AiQuickButtonVisibleSetting
+        ),
+        UserSetting(
+            name = R.string.ai_quick_button_appearance,
+            subtitle = R.string.ai_quick_button_appearance_description
+        ) {
+            val appearance = useDataStore(AiQuickButtonAppearanceSetting)
+            val labels = mapOf(
+                0 to stringResource(R.string.ai_quick_button_theme),
+                1 to stringResource(R.string.ai_quick_button_purple),
+                2 to stringResource(R.string.ai_quick_button_rgb),
+                3 to stringResource(R.string.ai_quick_button_relief)
+            )
+            DropDownPickerSettingItem(
+                label = stringResource(R.string.ai_quick_button_appearance),
+                options = listOf(0, 1, 2, 3),
+                selection = appearance.value,
+                onSet = { appearance.setValue(it) },
+                getDisplayName = { labels[it] ?: labels.getValue(0) }
+            )
+        },
 
         userSettingNavigationItem(
             title = R.string.action_editor_title,

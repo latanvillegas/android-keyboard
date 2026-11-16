@@ -7,7 +7,14 @@ import android.util.Log
 import android.view.View
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -39,6 +46,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.ButtonDefaults
@@ -78,6 +86,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.Fill
@@ -115,6 +124,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.futo.inputmethod.latin.uix.actions.media.AiQuickMode
+import org.futo.inputmethod.latin.uix.actions.media.AiQuickLaunch
+import org.futo.inputmethod.latin.uix.actions.media.OfflineAiAction
 import androidx.core.net.toUri
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -1052,6 +1064,153 @@ fun ImportantNoticeView(
     }
 }
 
+
+/**
+ * Themed one-row IA shortcut positioned before the user's pinned actions
+ * (next to the microphone by default).
+ *
+ * Theme mode reuses FUTO's existing advanced action button nine-slice assets.
+ * Purple/RGB/relief modes override only the IA button; they don't alter any
+ * user-created keyboard theme or increase keyboard height.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AiQuickAccessButton(
+    onSelect: (Action) -> Unit,
+    manager: KeyboardManagerForAction?
+) {
+    val scheme = LocalKeyboardScheme.current
+    val advanced = scheme.extended.advancedThemeOptions
+    val style = useDataStoreValue(AiQuickButtonAppearanceSetting).coerceIn(0, 3)
+    val reduceEffects = useDataStoreValue(ReduceVisualEffectsSetting)
+    val context = LocalContext.current
+    val view = LocalView.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+
+    val hue = if (style == 2 && !reduceEffects) {
+        val transition = rememberInfiniteTransition(label = "futo-ai-rgb")
+        val animation by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 15000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "futo-ai-rgb-hue"
+        )
+        animation
+    } else 0f
+
+    val background = advanced.actionButtonBackgroundColor
+        ?: scheme.keyboardContainer
+    val foreground = advanced.actionButtonForegroundColor
+        ?: scheme.onKeyboardContainer
+    val reliefShape = RoundedCornerShape(11.dp)
+    val buttonStyle = when (style) {
+        1 -> Modifier
+            .padding(horizontal = 3.dp, vertical = 3.dp)
+            .clip(reliefShape)
+            .background(Brush.verticalGradient(listOf(
+                Color(0xFFB267FF), Color(0xFF7530DB), Color(0xFF441A9B)
+            )))
+            .border(1.dp, Color(0xFFCDA6FF), reliefShape)
+        2 -> Modifier
+            .padding(horizontal = 3.dp, vertical = 3.dp)
+            .clip(reliefShape)
+            .background(Brush.linearGradient((0..4).map { idx ->
+                Color.hsv((hue + idx * 72f) % 360f, 0.83f, 0.94f)
+            }))
+            .border(1.dp, Color.White.copy(alpha = 0.75f), reliefShape)
+        3 -> Modifier
+            .padding(horizontal = 3.dp, vertical = 3.dp)
+            .clip(reliefShape)
+            .background(Brush.verticalGradient(listOf(
+                lerp(scheme.primary, Color.White, 0.38f),
+                scheme.primary,
+                lerp(scheme.primary, Color.Black, 0.43f)
+            )))
+            .border(1.dp, scheme.onPrimary.copy(alpha = 0.6f), reliefShape)
+        else -> Modifier.themeNineSliceBackground(
+            normal = advanced.actionButtonBorder,
+            pressedBorder = advanced.actionButtonPressedBorder,
+            isPressed = pressed,
+            fallback = background,
+            circular = true,
+            insetHorizontal = 3.dp,
+            insetVertical = 3.dp
+        )
+    }
+
+    Box(Modifier.width(48.dp).fillMaxHeight(), contentAlignment = Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(buttonStyle)
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = if (style == 0 && advanced.actionButtonBorder != null)
+                        null else LocalIndication.current,
+                    onClick = {
+                        onSelect(OfflineAiAction)
+                        manager?.performHapticAndAudioFeedback(Constants.CODE_TAB, view)
+                    },
+                    onLongClick = {
+                        if (manager == null) {
+                            onSelect(OfflineAiAction)
+                        } else {
+                            val operations = listOf(
+                                AiQuickMode.ANSWER,
+                                AiQuickMode.CORRECT,
+                                AiQuickMode.REWRITE,
+                                AiQuickMode.TRANSLATE,
+                                AiQuickMode.SUMMARIZE,
+                                AiQuickMode.FORMAL,
+                                AiQuickMode.INFORMAL
+                            )
+                            manager.requestDialog(
+                                text = context.getString(R.string.ai_quick_choose_operation),
+                                options = operations.map { operation ->
+                                    DialogRequestItem(
+                                        option = context.getString(operation.titleRes),
+                                        onClick = {
+                                            AiQuickLaunch.enqueue(operation)
+                                            onSelect(OfflineAiAction)
+                                        }
+                                    )
+                                },
+                                onCancel = {}
+                            )
+                            manager.performHapticAndAudioFeedback(Constants.CODE_TAB, view)
+                        }
+                    }
+                ),
+            contentAlignment = Center
+        ) {
+            Text(
+                text = "✦ IA",
+                color = when (style) {
+                    1, 2 -> Color.White
+                    3 -> scheme.onPrimary
+                    else -> foreground
+                },
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                maxLines = 1,
+                modifier = if (style == 2) {
+                    Modifier
+                        .background(
+                            Color.Black.copy(alpha = 0.38f),
+                            RoundedCornerShape(5.dp)
+                        )
+                        .padding(horizontal = 3.dp)
+                } else Modifier
+            )
+        }
+    }
+}
+
+
 @Composable
 fun RowScope.PinnedActionItems(onSelect: (Action) -> Unit, onLongSelect: (Action) -> Unit) {
     val actions = if(!LocalInspectionMode.current) {
@@ -1060,8 +1219,9 @@ fun RowScope.PinnedActionItems(onSelect: (Action) -> Unit, onLongSelect: (Action
         PinnedActions.default
     }
 
-    val actionItems = remember(actions) {
-        actions.toActionList()
+    val quickVisible = useDataStoreValue(AiQuickButtonVisibleSetting)
+    val actionItems = remember(actions, quickVisible) {
+        actions.toActionList().filterNot { quickVisible && it == OfflineAiAction }
     }
 
     actionItems.forEach {
@@ -1195,6 +1355,10 @@ fun ActionBar(
                         }
 
                         if(inlineSuggestions.isEmpty()) {
+                            if (useDataStoreValue(AiQuickButtonVisibleSetting) &&
+                                keyboardManagerForAction?.isSensitiveInputField() != true) {
+                                AiQuickAccessButton(onActionActivated, keyboardManagerForAction)
+                            }
                             PinnedActionItems(onActionActivated, onActionAltActivated)
                         }
                     }

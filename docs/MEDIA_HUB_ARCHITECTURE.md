@@ -18,7 +18,7 @@ Base: feature/fluent-emoji-3d-animated (PR #9, no master).
 
 ## Limitaciones
 
-Esta primera fase conserva el catálogo Fluent de PR #9 dentro del APK. Para reducir realmente el APK sin degradar calidad falta desarrollar un paquete de alta calidad instalable y hacer que el lookup existente pueda leer de almacenamiento externo o catálogo integrado.
+La rama hija PR #11 elimina los cuatro catálogos Fluent del APK y los distribuye en un ZIP externo íntegro y sin recodificación, usando índice dinámico; esta rama PR #10 conserva los originales por compatibilidad mientras se valida el paso siguiente.
 
 El motor KeyboardLM ya predice offline. La integración de un LLM conversacional GGUF, traducción generativa y edición animada GIF/TGS/WebM queda para fases independientes; no se presenta un falso backend IA. ZIP importa imágenes, pero no instala packs nativos de WhatsApp o Telegram.
 

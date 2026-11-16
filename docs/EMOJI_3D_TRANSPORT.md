@@ -2,7 +2,7 @@
 
 ## User-visible behavior
 
-The keyboard still displays its existing lightweight Fluent 3D previews.
+With the full media pack installed, the keyboard displays original 128px Fluent previews. Without it, the picker displays Unicode fallback and no Microsoft media is bundled into the Core APK.
 The receiving app, not the keyboard preview, determines how attached media
 are presented and whether animations play.
 
@@ -37,8 +37,10 @@ Android emoji standard.
 
 ## Sources and reproducibility
 
-The assets are generated during the APK build, never downloaded by the
-installed keyboard.
+The assets are built from pinned original sources on CI, published in a
+separate installable ZIP and removed from the Core APK before Gradle packaging.
+The installed keyboard imports this offline ZIP from the system file picker;
+it never downloads media silently.
 
 ### Static 3D catalog
 
@@ -46,12 +48,10 @@ installed keyboard.
   MIT license), commit
   `7a40f1a2d064d76e436813edc0f09b6c8cde5da8`.
 - `scripts/build_emoji3d_assets.py` creates **two independent catalogs**:
-  `assets/emoji3d/` uses the original 128px WebP quality 88 for scrolling
-  performance; `assets/emoji3d-share/` contains full RGBA lossless 256px
-  WebP of the same Unicode artwork to generate PNG shares.
+  `emoji3d/` contains 128px WebP previews and `emoji3d-share/` contains 256px lossless RGBA WebP. Both catalogs reside only in the optional offline ZIP.
 - The high-resolution sharing decoder does not expand the 16 MiB UI
   scrolling-cache budget. Android decodes high-resolution only when needed.
-- The build includes an index, manifest and full MIT license in both folders.
+- The separate ZIP includes indexes, source metadata and MIT licenses in both folders.
 
 ### Genuine animated 3D catalog
 
@@ -99,9 +99,7 @@ installed keyboard.
 
 Automation checks actual 256px output, transparent alpha, multiple distinct
 frames and valid MIME containers for all 30 animations; JVM tests confirm MIME
-priority and fallback. The preview CI compiles Stable Release with the
-full static/share/animated catalogs, checks the signature and APK contents,
-and produces a development-signed testing artifact.
+priority and fallback. The Core APK verification rejects any embedded Fluent media. A separate ZIP is verified using every SHA-256 and the correct indexes; the final signed APK and collection are distinct build artifacts.
 
 Before merging, test real outbound and received messages in WhatsApp,
 Telegram, Signal and Google Messages: verify actual animation playback,

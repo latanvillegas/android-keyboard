@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="custom_ai_prompt_editor_height">AI text input height</string>
+    <string name="custom_ai_prompt_editor_height_desc">Adjust the height of Text to process in the offline AI panel. Tap the number to enter an exact size in dp.</string>
+</resources>

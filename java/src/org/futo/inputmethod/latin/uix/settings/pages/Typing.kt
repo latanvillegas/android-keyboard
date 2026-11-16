@@ -99,6 +99,10 @@ import org.futo.inputmethod.latin.uix.AndroidTextInput
 import org.futo.inputmethod.latin.uix.BasicThemeProvider
 import org.futo.inputmethod.latin.uix.KeyHintsSetting
 import org.futo.inputmethod.latin.uix.SuggestionBarHeightSetting
+import org.futo.inputmethod.latin.uix.AiPromptEditorHeightSetting
+import org.futo.inputmethod.latin.uix.AiEditorGrowthModeSetting
+import org.futo.inputmethod.latin.uix.AiEditorMinHeightSetting
+import org.futo.inputmethod.latin.uix.AiEditorMaxHeightSetting
 import org.futo.inputmethod.latin.uix.SuggestionFontSizeSetting
 import org.futo.inputmethod.latin.uix.ActionIconScaleSetting
 import org.futo.inputmethod.latin.uix.KeyLabelScaleSetting
@@ -246,6 +250,47 @@ fun ResizeScreen(navController: NavHostController = rememberNavController()) {
                 setting = SuggestionBarHeightSetting,
                 range = 28.0f..120.0f,
                 hardRange = 24.0f..200.0f,
+                transform = { it.roundToInt() },
+                indicator = { "$it dp" }
+            )
+            // Auto: actual wrapped lines. Manual: fixed height. Hybrid: saved min/max.
+            val aiGrowthMode = useDataStore(AiEditorGrowthModeSetting)
+            val aiGrowthLabels = mapOf(
+                0 to stringResource(R.string.ai_editor_auto),
+                1 to stringResource(R.string.ai_editor_manual),
+                2 to stringResource(R.string.ai_editor_hybrid)
+            )
+            DropDownPickerSettingItem(
+                label = stringResource(R.string.ai_editor_mode_title),
+                options = listOf(0, 1, 2),
+                selection = aiGrowthMode.value,
+                onSet = { aiGrowthMode.setValue(it) },
+                getDisplayName = { aiGrowthLabels[it] ?: aiGrowthLabels.getValue(0) }
+            )
+            SettingSlider(
+                title = stringResource(R.string.custom_ai_prompt_editor_height),
+                subtitle = stringResource(R.string.custom_ai_prompt_editor_height_desc),
+                setting = AiPromptEditorHeightSetting,
+                range = 48.0f..180.0f,
+                hardRange = 40.0f..240.0f,
+                transform = { it.roundToInt() },
+                indicator = { "$it dp" }
+            )
+            SettingSlider(
+                title = stringResource(R.string.ai_editor_min),
+                subtitle = stringResource(R.string.ai_editor_min_description),
+                setting = AiEditorMinHeightSetting,
+                range = 44.0f..150.0f,
+                hardRange = 40.0f..200.0f,
+                transform = { it.roundToInt() },
+                indicator = { "$it dp" }
+            )
+            SettingSlider(
+                title = stringResource(R.string.ai_editor_max),
+                subtitle = stringResource(R.string.ai_editor_max_description),
+                setting = AiEditorMaxHeightSetting,
+                range = 120.0f..260.0f,
+                hardRange = 80.0f..340.0f,
                 transform = { it.roundToInt() },
                 indicator = { "$it dp" }
             )
@@ -905,6 +950,13 @@ val KeyboardSettingsMenu = UserSettingsMenu(
         userSettingToggleDataStore(
             title = R.string.keyboard_settings_hide_when_hardware_keyboard_is_connected,
             setting = HideKeyboardWhenHardKeyboardConnected
+        ),
+        userSettingNavigationItem(
+            title = R.string.hardware_keyboard_settings_title,
+            subtitle = R.string.hardware_keyboard_settings_summary,
+            style = NavigationItemStyle.Misc,
+            navigateTo = "physicalKeyboard",
+            icon = R.drawable.keyboard
         )
     )
 )

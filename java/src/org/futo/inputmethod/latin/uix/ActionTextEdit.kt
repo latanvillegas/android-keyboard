@@ -45,6 +45,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -187,6 +188,8 @@ private fun GenericEditTextCompose(
     forceQwerty: Boolean = false,
     forcedLayout: String? = null,
     inputFilters: Array<InputFilter>? = null,
+    dynamicHeight: Boolean = false,
+    onVisualLineCountChanged: ((Int) -> Unit)? = null,
 ) {
     val context = LocalContext.current
 
@@ -208,11 +211,25 @@ private fun GenericEditTextCompose(
     val textSizeToUse = with(LocalDensity.current) { textSize.toPx() }
     val typefaceToUse = typeface
     val inspection = LocalInspectionMode.current
+    // Recomposition must not leave an Android TextWatcher with a stale callback.
+    val lineCallback = rememberUpdatedState(onVisualLineCountChanged)
     val editText = remember {
         ActionEditText(context, inspection = inspection).apply {
             this.inputType = inputType
 
-            setTextChangeCallback { text.value = it }
+            setTextChangeCallback { newValue ->
+                text.value = newValue
+                if (dynamicHeight) {
+                    post { lineCallback.value?.invoke(lineCount.coerceAtLeast(1)) }
+                }
+            }
+            if (dynamicHeight) {
+                // Width changes (tablet split-screen or rotation) alter wrapping
+                // even if the string itself has not changed.
+                addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                    post { lineCallback.value?.invoke(lineCount.coerceAtLeast(1)) }
+                }
+            }
 
             if(inputFilters != null) filters = inputFilters
 
@@ -226,7 +243,8 @@ private fun GenericEditTextCompose(
 
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                if (dynamicHeight) ViewGroup.LayoutParams.MATCH_PARENT
+                else ViewGroup.LayoutParams.WRAP_CONTENT
             )
 
             privateImeOptions = StringBuilder().apply {
@@ -235,7 +253,8 @@ private fun GenericEditTextCompose(
                 if(forcedLayout != null) append(forcedLayout)
             }.toString()
 
-            setHeight(height.toInt())
+            if (!dynamicHeight) setHeight(height.toInt())
+            else minHeight = 0
 
             if(onOverride != null) {
                 val editorInfo = EditorInfo().apply {
@@ -265,6 +284,9 @@ private fun GenericEditTextCompose(
     LaunchedEffect(text.value) {
         if(text.value != editText.getText().toString()) {
             editText.setText(text.value)
+            if (dynamicHeight) {
+                editText.setSelection(editText.text?.length ?: 0)
+            }
         }
     }
 
@@ -321,7 +343,9 @@ fun ActionTextEditor(
     onEnter: (() -> Unit)? = null,
     autofocus: Boolean = true,
     inputFilters: Array<InputFilter>? = null,
-    placeholder: String? = null
+    placeholder: String? = null,
+    dynamicHeight: Boolean = false,
+    onVisualLineCountChanged: ((Int) -> Unit)? = null
 ) {
     val manager = if(!LocalInspectionMode.current) LocalManager.current else null
     GenericEditTextCompose(
@@ -343,6 +367,8 @@ fun ActionTextEditor(
             afterUnOverride?.invoke(result)
         },
         inputFilters = inputFilters,
+        dynamicHeight = dynamicHeight,
+        onVisualLineCountChanged = onVisualLineCountChanged
     )
 }
 

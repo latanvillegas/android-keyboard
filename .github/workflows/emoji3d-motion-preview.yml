@@ -4,11 +4,17 @@ on:
   pull_request:
     paths:
       - "java/**"
+      - "offline-ai-runtime/**"
       - "scripts/build_emoji3d_motion.py"
       - "scripts/build_emoji3d_assets.py"
       - "tests/unit/**"
       - ".github/workflows/emoji3d-motion-preview.yml"
   workflow_dispatch:
+    inputs:
+      lite:
+        description: "Build core APK without ANY Fluent media plus all-four-catalog offline ZIP"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -18,6 +24,7 @@ permissions:
 jobs:
   static-assets:
     name: Produce/cache 256px lossless RGBA static artwork
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.lite) || (github.event_name == 'pull_request' && github.head_ref == 'feature/fluent3d-optional-hq-pack-lite-apk' && contains(github.event.pull_request.title, '[ci-final]')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -77,6 +84,7 @@ jobs:
 
   motion-assets:
     name: Produce/cache 30 genuine 256px lossless animations
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.lite) || (github.event_name == 'pull_request' && github.head_ref == 'feature/fluent3d-optional-hq-pack-lite-apk' && contains(github.event.pull_request.title, '[ci-final]')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 110
     steps:
@@ -147,6 +155,7 @@ jobs:
           du -h -s java/assets/emoji3d-motion
 
   animated-preview:
+    if: ${{ github.event_name != 'workflow_dispatch' && github.head_ref != 'feature/fluent3d-optional-hq-pack-lite-apk' }}
     name: Compile, sign and inspect complete Stable Release preview
     needs: [static-assets, motion-assets]
     concurrency:
@@ -317,5 +326,246 @@ jobs:
         with:
           name: futo-keyboard-fluent-3d-motion-preview
           path: preview-dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  lite-preview:
+    # This is a one-time explicit PR final integration CI gate.
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.lite) || (github.event_name == 'pull_request' && github.head_ref == 'feature/fluent3d-optional-hq-pack-lite-apk' && contains(github.event.pull_request.title, '[ci-final]')) }}
+    name: Build signed small APK + original quality offline media package
+    needs: [static-assets, motion-assets]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          lfs: false
+
+      - name: Restore validated 128px picker and full 256px still art
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            java/assets/emoji3d
+            java/assets/emoji3d-share
+          key: fluent3d-static128-share256-lossless-v3-7a40f1a2d064d76e436813edc0f09b6c8cde5da8-${{ hashFiles('scripts/build_emoji3d_assets.py') }}
+          fail-on-cache-miss: true
+
+      - name: Restore verified lossless WebP and GIF animations
+        uses: actions/cache/restore@v4
+        with:
+          path: java/assets/emoji3d-motion
+          key: fluent3d-motion-lossless-webp256-gif256-v3-daa0365c09795789ed2bc6e8b228c97736cb6669-${{ hashFiles('scripts/build_emoji3d_motion.py') }}
+          fail-on-cache-miss: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Unit-test full Fluent ZIP reproducibility without Android
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts -p test_fluent3d_full_pack.py -v
+
+      - name: Build independently installable FULL fidelity Fluent asset pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p lite-dist
+          python -u scripts/build_fluent3d_hq_pack.py \
+            --preview java/assets/emoji3d \
+            --share java/assets/emoji3d-share \
+            --motion java/assets/emoji3d-motion \
+            --out lite-dist/fluent3d-full-offline-collection.zip
+
+      - name: Remove ALL four Fluent catalogs before APK assembly
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(wc -l < java/assets/emoji3d/index.txt)" -ge 2500
+          test "$(wc -l < java/assets/emoji3d-share/index.txt)" -ge 2500
+          test "$(wc -l < java/assets/emoji3d-motion/index.txt)" -eq 30
+          test -s lite-dist/fluent3d-full-offline-collection.zip
+          rm -rf java/assets/emoji3d java/assets/emoji3d-share java/assets/emoji3d-motion
+          test ! -e java/assets/emoji3d
+          test ! -e java/assets/emoji3d-share
+          test ! -e java/assets/emoji3d-motion
+          echo "Fluent assets all external; no static, GIF or motion catalog in APK"
+
+      - name: Initialize pinned Android submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule sync --recursive
+          git -c protocol.version=2 submodule update --init --depth 1 --jobs 4 -- \
+            libs translations java/assets/layouts java/assets/themes java/res-large \
+            voiceinput-shared/src/main/ml
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK, NDK and CMake
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install \
+            "platforms;android-35" "build-tools;35.0.0" \
+            "ndk;28.2.13676358" "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Run JVM tests and compile lightweight release
+        shell: bash
+        env:
+          VERSION_NAME: emoji3d-mediahub-lite
+          VERSION_CODE: "900003"
+          BRANCH_NAME: master
+        run: |
+          set -euo pipefail
+          test -f java/shared.keystore
+          chmod +x gradlew
+          # Compile/test first; do not launch the costly APK tasks on a JVM test failure.
+          ./gradlew --no-daemon --build-cache --stacktrace \
+            --warning-mode summary testStableReleaseUnitTest
+          ./gradlew --no-daemon --build-cache --stacktrace \
+            --warning-mode summary assembleStableRelease
+
+      - name: Build OPTIONAL signed no-network local AI runtime APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon --build-cache --stacktrace --warning-mode summary \
+            -p offline-ai-runtime :app:assembleRelease
+          runtime="$(find offline-ai-runtime/app/build/outputs/apk/release \
+            -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          test -s "$runtime"
+          cp "$runtime" lite-dist/futo-local-ai-runtime.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose \
+            lite-dist/futo-local-ai-runtime.apk \
+            > lite-dist/local-ai-runtime-signature.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions \
+            lite-dist/futo-local-ai-runtime.apk \
+            > lite-dist/local-ai-runtime-permissions.txt
+          if grep -q 'android.permission.INTERNET' \
+            lite-dist/local-ai-runtime-permissions.txt; then
+            echo "::error::Optional local AI APK must not request INTERNET"
+            exit 1
+          fi
+
+      - name: Verify APK contains no Fluent files and external pack preserves all media
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check Pillow==11.3.0
+          apk="$(find build/outputs/apk/stable/release -maxdepth 1 \
+            -name '*.apk' -type f | head -n 1)"
+          test -s "$apk"
+          cp "$apk" lite-dist/futo-keyboard-media-hub-lite.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose \
+            lite-dist/futo-keyboard-media-hub-lite.apk \
+            > lite-dist/apk-signature.txt
+          unzip -t lite-dist/futo-keyboard-media-hub-lite.apk \
+            > lite-dist/apk-zip-integrity.txt
+          python - <<'PY'
+          import hashlib
+          import io
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile
+          from PIL import Image
+
+          apk_path = Path("lite-dist/futo-keyboard-media-hub-lite.apk")
+          pack_path = Path("lite-dist/fluent3d-full-offline-collection.zip")
+          with ZipFile(apk_path) as apk:
+              prefixes = ("assets/emoji3d/", "assets/emoji3d-share/",
+                          "assets/emoji3d-motion/")
+              for name in apk.namelist():
+                  assert not name.startswith(prefixes), "Media bundled in APK: " + name
+              print("Core APK: zero Fluent 3D bitmap and animation files")
+
+          with ZipFile(pack_path) as pack:
+              manifest = json.loads(pack.read("fluent-hq.json"))
+              assert manifest["format"] == "fluent3d-full-v2"
+              assert manifest["version"] == 2
+              picker = pack.read("emoji3d/index.txt").decode().splitlines()
+              sharing = pack.read("emoji3d-share/index.txt").decode().splitlines()
+              motion = pack.read("emoji3d-motion/index.txt").decode().splitlines()
+              assert len(picker) >= 2500 and picker == sharing
+              assert len(motion) == 30
+              assert manifest["ui_count"] == len(picker)
+              assert manifest["share_count"] == len(sharing)
+              assert manifest["motion_count"] == len(motion)
+              entries = manifest["members"]
+              assert len(entries) == 2 * len(picker) + 2 * len(motion) + 9
+              assert set(pack.namelist()) == set(entries) | {"fluent-hq.json"}
+              for folder in ("emoji3d", "emoji3d-share", "emoji3d-motion"):
+                  for meta in ("index.txt", "LICENSE.txt", "SOURCE.json"):
+                      assert f"{folder}/{meta}" in entries
+              for key in picker:
+                  assert f"emoji3d/{key}.webp" in entries
+                  assert f"emoji3d-share/{key}.webp" in entries
+              for key in motion:
+                  assert f"emoji3d-motion/{key}.webp" in entries
+                  assert f"emoji3d-motion/{key}.gif" in entries
+              for name, expected in entries.items():
+                  digest = hashlib.sha256()
+                  with pack.open(name) as stream:
+                      for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                          digest.update(chunk)
+                  assert digest.hexdigest() == expected, name
+              with Image.open(io.BytesIO(
+                  pack.read("emoji3d-share/1f600.webp"))) as still:
+                  assert still.size == (256, 256)
+                  assert still.getchannel("A").getextrema()[0] < 255
+              with Image.open(io.BytesIO(
+                  pack.read("emoji3d-motion/1f600.webp"))) as animation:
+                  assert animation.size == (256, 256)
+                  assert animation.n_frames > 1
+              with Image.open(io.BytesIO(
+                  pack.read("emoji3d-motion/1f600.gif"))) as gif:
+                  assert gif.n_frames > 1
+              print(f"Verified full external collection: {len(picker)} UI previews, "
+                    f"{len(sharing)} lossless RGBA masters, "
+                    f"{len(motion)} Animated WebP and GIF pairs; all SHA256 passed")
+          PY
+          keyboard_cert="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify \
+            --print-certs lite-dist/futo-keyboard-media-hub-lite.apk \
+            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          runtime_cert="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify \
+            --print-certs lite-dist/futo-local-ai-runtime.apk \
+            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          test -n "$keyboard_cert"
+          test "$keyboard_cert" = "$runtime_cert"
+          echo "The keyboard and optional AI companion use the same signing cert"
+          (cd lite-dist && sha256sum \
+            futo-keyboard-media-hub-lite.apk \
+            futo-local-ai-runtime.apk \
+            fluent3d-full-offline-collection.zip) > lite-dist/SHA256SUMS
+          printf '%s\n' \
+            "Source commit: $GITHUB_SHA" \
+            "Keyboard: zero bundled Fluent 3D catalogs; Unicode fallback available" \
+            "Optional offline inference: separate signed APK and manually imported model" \
+            "Optional AI companion network permission: none" \
+            "Original 128px, 256px RGBA, animated WebP and GIF: optional offline ZIP" \
+            "Signing: DEVELOPMENT/test key; not an upgrade to production builds" \
+            "Run: $GITHUB_RUN_ID" \
+            > lite-dist/BUILD-INFO.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: futo-media-hub-core-apk-plus-fluent-full-pack
+          path: lite-dist/
           if-no-files-found: error
           retention-days: 30

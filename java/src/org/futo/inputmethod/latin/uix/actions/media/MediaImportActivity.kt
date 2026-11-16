@@ -23,22 +23,30 @@ class MediaImportActivity : ComponentActivity() {
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 var imported = 0
+                var packs = 0
                 val errors = mutableListOf<String>()
                 for (uri in files.take(100)) {
                     try {
-                        imported += if (MediaPackImporter.hasZipSignature(this@MediaImportActivity, uri)) {
-                            MediaPackImporter.importPack(this@MediaImportActivity, uri)
+                        if (MediaPackImporter.hasZipSignature(this@MediaImportActivity, uri)) {
+                            if (FluentHqPackStore.isFluentPack(this@MediaImportActivity, uri)) {
+                                FluentHqPackStore.install(this@MediaImportActivity, uri)
+                                packs++
+                            } else {
+                                imported += MediaPackImporter.importPack(this@MediaImportActivity, uri)
+                            }
                         } else {
                             MediaLibrary.importUri(this@MediaImportActivity, uri)
-                            1
+                            imported++
                         }
                     } catch (error: Exception) {
                         errors.add(error.message ?: "Invalid media file")
                     }
                 }
-                imported to errors
+                Triple(imported, errors, packs)
             }
             val message = when {
+                result.third > 0 && result.second.isEmpty() ->
+                    getString(R.string.media_hq_installed)
                 result.first > 0 && result.second.isEmpty() ->
                     getString(R.string.media_import_success, result.first)
                 result.first > 0 ->

@@ -60,6 +60,7 @@ import org.futo.inputmethod.engine.ExpandableSuggestionBarConfiguration
 import org.futo.inputmethod.engine.IMEManager
 import org.futo.inputmethod.engine.general.WordLearner
 import org.futo.inputmethod.latin.SuggestedWords.SuggestedWordInfo
+import org.futo.inputmethod.latin.hardware.PhysicalKeyboardController
 import org.futo.inputmethod.latin.common.Constants
 import org.futo.inputmethod.latin.settings.Settings
 import org.futo.inputmethod.latin.uix.BasicThemeProvider
@@ -489,6 +490,8 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
 
         uixManager.onCreate()
 
+        physicalKeyboardController = PhysicalKeyboardController(this).also { it.attach() }
+
         Settings.getInstance().settingsChangedListeners.add { oldSettings, newSettings ->
             val differs = (oldSettings.mActionKeyId != newSettings.mActionKeyId)
                     || (oldSettings.mShowsActionKey != newSettings.mShowsActionKey)
@@ -508,9 +511,13 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
         uixManager.updateLocale(Subtypes.getLocale(subtype))
     }
 
+    private var physicalKeyboardController: PhysicalKeyboardController? = null
+
     private var destroying = false
     override fun onDestroy() {
         destroying = true
+        physicalKeyboardController?.detach()
+        physicalKeyboardController = null
         unregisterReceiver(unlockReceiver)
         stopJobs()
         viewModelStore.clear()
@@ -527,6 +534,7 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
         updateNavigationBarVisibility()
         latinIMELegacy.onConfigurationChanged(newConfig)
         super.onConfigurationChanged(newConfig)
+        physicalKeyboardController?.refresh()
         uixManager.updateLocaleOnCfgChanged()
     }
 
@@ -774,9 +782,10 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
     }
 
     override fun onEvaluateInputViewShown(): Boolean {
-        return latinIMELegacy.onEvaluateInputViewShown()
+        val nativeDecision = latinIMELegacy.onEvaluateInputViewShown()
                 || super.onEvaluateInputViewShown()
                 || !getSetting(HideKeyboardWhenHardKeyboardConnected)
+        return physicalKeyboardController?.shouldShow(nativeDecision) ?: nativeDecision
     }
 
     override fun onEvaluateFullscreenMode(): Boolean {

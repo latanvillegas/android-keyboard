@@ -1,0 +1,87 @@
+name: Build FUTO optional offline AI runtime
+
+on:
+  push:
+    branches: [feature/fluent3d-optional-hq-pack-lite-apk]
+    paths:
+      - "offline-ai-runtime/**"
+      - ".github/workflows/futo-optional-ai-runtime.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: futo-local-ai-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Compile and verify optional offline AI APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          lfs: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install required Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Compile optional AI runtime without any model weights
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew -p offline-ai-runtime --no-daemon --stacktrace :app:assembleRelease
+
+      - name: Verify signature, APK integrity and offline permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="offline-ai-runtime/app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
+          unzip -t "$apk" >/dev/null
+          if "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" | grep -q "android.permission.INTERNET"; then
+            echo "::error::Offline AI runtime requests INTERNET"
+            exit 1
+          fi
+          python3 - "$apk" <<'PY'
+          from sys import argv
+          from zipfile import ZipFile
+          with ZipFile(argv[1]) as archive:
+              models = [name for name in archive.namelist()
+                        if name.lower().endswith((".litertlm", ".task", ".gguf"))]
+              if models:
+                  raise SystemExit("Model weights in optional runtime: " + repr(models[:5]))
+          print("Offline runtime has zero model weights")
+          PY
+          mkdir -p release-dist
+          cp "$apk" release-dist/futo-local-ai-runtime.apk
+          test "$(find release-dist -maxdepth 1 -type f | wc -l)" -eq 1
+
+      - name: Upload only optional runtime APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: futo-local-ai-runtime-test-signed
+          path: release-dist/futo-local-ai-runtime.apk
+          compression-level: 9
+          if-no-files-found: error
+          retention-days: 30

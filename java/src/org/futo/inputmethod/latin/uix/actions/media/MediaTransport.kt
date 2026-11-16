@@ -33,6 +33,10 @@ internal object MediaTransport {
         } catch (_: Exception) {
             false
         }
-        if (accepted) Result.ACCEPTED else Result.REJECTED
+        if (accepted) {
+            // A successful send is recorded for both gallery entry points.
+            runCatching { MediaLibrary.markUsed(manager.getContext(), item.id) }
+            Result.ACCEPTED
+        } else Result.REJECTED
     }
 }

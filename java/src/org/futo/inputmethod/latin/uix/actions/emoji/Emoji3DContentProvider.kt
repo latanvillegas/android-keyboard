@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import org.futo.inputmethod.latin.BuildConfig
+import org.futo.inputmethod.latin.uix.actions.media.FluentHqPackStore
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
@@ -50,8 +51,9 @@ internal object Emoji3DShareStore {
     private fun directory(context: Context): File =
         File(context.cacheDir, DIRECTORY)
 
-    private fun assetId(key: String, format: Format): String {
-        val value = "$CACHE_VERSION:$key:" + format.extension
+    private fun assetId(context: Context, key: String, format: Format): String {
+        val value = "$CACHE_VERSION:" + FluentHqPackStore.contentVersion(context) +
+            ":$key:" + format.extension
         val bytes = MessageDigest.getInstance("SHA-256")
             .digest(value.toByteArray(StandardCharsets.UTF_8))
         val digits = "0123456789abcdef"
@@ -91,7 +93,7 @@ internal object Emoji3DShareStore {
             return null
         }
 
-        val id = assetId(key, format)
+        val id = assetId(app, key, format)
         synchronized(guard) {
             val dir = directory(app)
             if (!dir.isDirectory && !dir.mkdirs()) {
