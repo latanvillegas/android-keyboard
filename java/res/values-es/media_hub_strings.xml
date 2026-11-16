@@ -42,7 +42,7 @@
     <string name="gif_editor_invalid">No se pudo decodificar el GIF.</string>
     <string name="gif_editor_saved">Guardado: %1$s</string>
     <string name="local_ai_title">Asistente IA offline</string>
-    <string name="local_ai_privacy">Solo se procesa el texto que escribas aquí, en tu dispositivo. Instala el runtime opcional y un modelo .task compatible.</string>
+    <string name="local_ai_privacy">Solo se procesa en el dispositivo el texto que escribas aquí. Instala el complemento IA y un modelo compatible LiteRT-LM .litertlm o MediaPipe .task.</string>
     <string name="local_ai_input">Texto para procesar</string>
     <string name="local_ai_correct">Corregir</string>
     <string name="local_ai_rewrite">Reescribir</string>

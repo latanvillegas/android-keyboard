@@ -7,7 +7,7 @@
     <string name="addons_models_title">Manage offline FUTO models</string>
     <string name="addons_models_description">Choose or import compatible FUTO prediction models</string>
     <string name="addons_ai_title">Offline AI assistant and external model</string>
-    <string name="addons_ai_description">Configure the separately installed AI runtime and a compatible MediaPipe .task model</string>
+    <string name="addons_ai_description">Install the optional AI runtime; import a LiteRT-LM .litertlm Qwen model or a MediaPipe .task model</string>
     <string name="addons_actions_title">Customize multimedia and AI actions</string>
     <string name="addons_actions_description">Choose and rearrange the configurable keyboard action shortcuts</string>
     <string name="addons_import_manual">Import manually from file</string>
@@ -20,8 +20,9 @@
     <string name="addons_open_failed">Cannot open the selected application or link.</string>
     <string name="addons_media_hint">GIF, PNG, JPEG, WebP and supported image ZIPs can be imported. Downloaded files remain in private local storage.</string>
     <string name="addons_fluent_source_notice">The default link points to a temporary historical GitHub Actions artifact. Download the artifact ZIP, extract fluent3d-full-offline-collection.zip and import that inner ZIP only. Change the link if the artifact expires. The Microsoft source repository ZIP is not directly installable.</string>
-    <string name="addons_ai_source_notice">MediaPipe .task models are different from FUTO KeyboardLM GGUF models. The optional runtime APK must be separately installed and signed with the same certificate as FUTO. This link opens documentation, not a prevalidated model download.</string>
+    <string name="addons_ai_source_notice">The Qwen link opens a pinned 1.6 GB LiteRT-LM model. Download it in your browser, then select Import manually, open Qwen LiteRT and import .litertlm. The separately installed runtime must have the same signing certificate as FUTO. MediaPipe .task and KeyboardLM GGUF are different formats.</string>
     <string name="addons_runtime_source">View external AI runtime source code</string>
+    <string name="addons_runtime_download">Download optional FUTO AI runtime APK</string>
     <string name="addons_removed">External Fluent 3D collection removed.</string>
     <string name="addons_remove_failed">Could not remove the external Fluent 3D collection.</string>
 </resources>

@@ -70,7 +70,7 @@ enum class AddonKind(
         R.string.addons_ai_title,
         R.string.addons_ai_description,
         "source_ai",
-        "https://ai.google.dev/gemma/docs/integrations/mobile"
+        "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/blob/19edb84c69a0212f29a6ef17ba0d6f278b6a1614/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm"
     )
 }
 
@@ -231,6 +231,16 @@ fun OptionalAddonScreen(navController: NavHostController, kind: AddonKind) {
                     onClick = { navController.navigate("models") },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text(stringResource(R.string.addons_models_title)) }
+                OutlinedButton(
+                    onClick = {
+                        openVerifiedSource(
+                            context,
+                            "https://github.com/latanvillegas/android-keyboard/actions/workflows/" +
+                                "futo-optional-ai-runtime.yml"
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(stringResource(R.string.addons_runtime_download)) }
                 OutlinedButton(
                     onClick = {
                         openVerifiedSource(

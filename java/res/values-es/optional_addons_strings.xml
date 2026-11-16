@@ -7,7 +7,7 @@
     <string name="addons_models_title">Administrar modelos FUTO sin conexión</string>
     <string name="addons_models_description">Elige o importa modelos de predicción compatibles con FUTO</string>
     <string name="addons_ai_title">Asistente IA offline y modelo externo</string>
-    <string name="addons_ai_description">Configura el complemento IA independiente y un modelo MediaPipe .task compatible</string>
+    <string name="addons_ai_description">Instala el complemento IA e importa un modelo Qwen LiteRT-LM .litertlm o MediaPipe .task</string>
     <string name="addons_actions_title">Personalizar acciones multimedia e IA</string>
     <string name="addons_actions_description">Selecciona y ordena los accesos configurables de las acciones del teclado</string>
     <string name="addons_import_manual">Importar manualmente desde archivo</string>
@@ -20,8 +20,9 @@
     <string name="addons_open_failed">No se pudo abrir la aplicación o el enlace seleccionado.</string>
     <string name="addons_media_hint">Puedes importar GIF, PNG, JPEG, WebP y ZIP compatibles. Los archivos descargados se guardan localmente.</string>
     <string name="addons_fluent_source_notice">El enlace predeterminado lleva a un artefacto temporal anterior de GitHub Actions. Descarga el ZIP del artefacto, extrae fluent3d-full-offline-collection.zip e importa solamente ese ZIP interno. Si caduca el enlace, puedes modificarlo. El ZIP original del repositorio Microsoft no se instala directamente.</string>
-    <string name="addons_ai_source_notice">Los modelos MediaPipe .task no son equivalentes a los GGUF KeyboardLM de FUTO. Debes instalar por separado el APK complementario IA con la misma firma que FUTO. Este enlace abre documentación, no un modelo previamente validado.</string>
+    <string name="addons_ai_source_notice">El enlace de Qwen abre un modelo LiteRT-LM de 1,6 GB con versión fijada. Descárgalo en el navegador, selecciona Importar manualmente, abre Qwen LiteRT e importa el archivo .litertlm. El complemento APK necesita la misma firma que FUTO. MediaPipe .task y KeyboardLM GGUF son formatos distintos.</string>
     <string name="addons_runtime_source">Ver código fuente del complemento IA</string>
+    <string name="addons_runtime_download">Descargar APK complementario de IA FUTO</string>
     <string name="addons_removed">Colección externa Fluent 3D eliminada.</string>
     <string name="addons_remove_failed">No se pudo eliminar la colección externa Fluent 3D.</string>
 </resources>

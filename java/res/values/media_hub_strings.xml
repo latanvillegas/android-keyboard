@@ -42,7 +42,7 @@
     <string name="gif_editor_invalid">GIF could not be decoded.</string>
     <string name="gif_editor_saved">Saved: %1$s</string>
     <string name="local_ai_title">Offline AI writer</string>
-    <string name="local_ai_privacy">Only text you enter here is processed on-device. Install the optional runtime and a compatible .task model.</string>
+    <string name="local_ai_privacy">Only text you enter here is processed on-device. Install the optional runtime and a compatible LiteRT-LM .litertlm or MediaPipe .task model.</string>
     <string name="local_ai_input">Text to process</string>
     <string name="local_ai_correct">Correct</string>
     <string name="local_ai_rewrite">Rewrite</string>
