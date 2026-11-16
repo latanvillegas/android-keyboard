@@ -11,6 +11,7 @@ import android.os.Messenger
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import java.io.File
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Optional local model APK. IPC is signature-protected in the manifest.
@@ -28,6 +29,8 @@ class LocalAiService : Service() {
         Thread(runnable, "futo-local-inference").apply { isDaemon = true }
     }
     private var engine: LlmInference? = null
+    private val liteRtEngine = LiteRtEngine()
+    private val requestBusy = AtomicBoolean(false)
     private var activeStamp = -1L
 
     private val incoming by lazy {
@@ -36,33 +39,58 @@ class LocalAiService : Service() {
             val reply = message.replyTo ?: return@Handler true
             val prompt = message.data.getString("prompt").orEmpty()
             val token = message.data.getLong("token", -1L)
+            if (!requestBusy.compareAndSet(false, true)) {
+                val busyResponse = Bundle().apply {
+                    putLong("token", token)
+                    putString("error", "Another local inference request is running")
+                }
+                try {
+                    reply.send(Message.obtain(null, MSG_RESPONSE).apply { data = busyResponse })
+                } catch (_: Exception) { }
+                return@Handler true
+            }
             executor.execute {
                 val response = Bundle().apply {
                     putLong("token", token)
                     try {
                         if (prompt.isBlank() || prompt.length > MAX_PROMPT_CHARS)
                             throw IllegalArgumentException("Prompt must be 1–2500 chars")
-                        val model = File(File(filesDir, "llm"), "model.task")
-                        if (!model.isFile || model.length() < 1024)
-                            throw IllegalStateException("Install a compatible .task model first")
-                        if (engine == null || activeStamp != model.lastModified()) {
-                            engine?.close()
-                            engine = null
-                            val options = LlmInference.LlmInferenceOptions.builder()
-                                .setModelPath(model.absolutePath)
-                                .setMaxTokens(768)
-                                .setMaxTopK(40)
-                                .build()
-                            engine = LlmInference.createFromOptions(
-                                this@LocalAiService, options
-                            )
-                            activeStamp = model.lastModified()
+                        val folder = File(filesDir, "llm")
+                        val liteRt = File(folder, "model.litertlm")
+                        val result = if (liteRt.isFile) {
+                            // User-imported LiteRT Qwen takes precedence. Removing it
+                            // falls back to the existing MediaPipe .task backend.
+                            liteRtEngine.generate(liteRt, prompt)
+                        } else {
+                            val model = File(folder, "model.task")
+                            if (!model.isFile || model.length() < 1024)
+                                throw IllegalStateException(
+                                    "Import a compatible .litertlm or .task model first"
+                                )
+                            if (engine == null || activeStamp != model.lastModified()) {
+                                engine?.close()
+                                engine = null
+                                val options = LlmInference.LlmInferenceOptions.builder()
+                                    .setModelPath(model.absolutePath)
+                                    .setMaxTokens(768)
+                                    .setMaxTopK(40)
+                                    .build()
+                                engine = LlmInference.createFromOptions(
+                                    this@LocalAiService, options
+                                )
+                                activeStamp = model.lastModified()
+                            }
+                            requireNotNull(engine).generateResponse(prompt)
                         }
-                        val result = requireNotNull(engine).generateResponse(prompt)
                         putString("text", result.take(MAX_RESULT_CHARS))
                     } catch (error: Exception) {
                         putString("error", (error.message ?: error.javaClass.simpleName)
                             .take(400))
+                    } catch (error: LinkageError) {
+                        putString("error", "LiteRT native library unavailable: " +
+                            error.javaClass.simpleName)
+                    } finally {
+                        requestBusy.set(false)
                     }
                 }
                 try {
@@ -85,6 +113,7 @@ class LocalAiService : Service() {
         executor.execute {
             try { engine?.close() } catch (_: Exception) {}
             engine = null
+            liteRtEngine.close()
         }
         executor.shutdown()
         super.onDestroy()

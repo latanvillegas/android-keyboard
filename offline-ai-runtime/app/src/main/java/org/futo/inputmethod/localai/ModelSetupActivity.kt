@@ -54,6 +54,13 @@ class ModelSetupActivity : Activity() {
         }
         layout.addView(choose)
         layout.addView(Button(this).apply {
+            text = "Qwen LiteRT (.litertlm): download / import / remove"
+            setOnClickListener {
+                startActivity(Intent(this@ModelSetupActivity,
+                    LiteRtModelSetupActivity::class.java))
+            }
+        })
+        layout.addView(Button(this).apply {
             text = "Remove model"
             setOnClickListener {
                 status.text = if (modelFile.delete()) "Model removed"

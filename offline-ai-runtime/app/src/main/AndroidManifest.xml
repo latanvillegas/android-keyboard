@@ -19,5 +19,8 @@
             android:name=".ModelSetupActivity"
             android:exported="true"
             android:permission="org.futo.inputmethod.latin.permission.LOCAL_AI" />
+        <activity
+            android:name=".LiteRtModelSetupActivity"
+            android:exported="false" />
     </application>
 </manifest>
