@@ -134,6 +134,13 @@ private fun MediaHubPanel(manager: KeyboardManagerForAction, search: String) {
                         }
                     )
                     DropdownMenuItem(
+                        text = { Text(stringResource(R.string.media_quick_video_to_gif)) },
+                        onClick = {
+                            createOpen = false
+                            startActivity(VideoGifCreatorActivity::class.java)
+                        }
+                    )
+                    DropdownMenuItem(
                         text = { Text(stringResource(R.string.media_quick_edit_gif)) },
                         onClick = {
                             createOpen = false

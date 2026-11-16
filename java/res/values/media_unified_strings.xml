@@ -55,4 +55,15 @@
     <string name="media_quick_export">Export ZIP</string>
     <string name="media_quick_models">Offline AI model settings</string>
     <string name="media_quick_remove_fluent">Remove Fluent 3D pack</string>
+    <string name="media_video_gif_title">Create GIF from video</string>
+    <string name="media_video_gif_limits">Select a video clip: up to 15 seconds, 320 px, 60 frames and 24 MiB. Export runs locally.</string>
+    <string name="media_video_choose">Choose video</string>
+    <string name="media_video_ready">Video selected. Configure the clip and create GIF.</string>
+    <string name="media_video_start">Starting second</string>
+    <string name="media_video_duration">Duration (seconds, max 15)</string>
+    <string name="media_video_fps">Frames per second (4–10)</string>
+    <string name="media_video_create">Create and save GIF</string>
+    <string name="media_video_invalid">Invalid video segment or unsupported format</string>
+    <string name="media_video_progress">Encoding frame %1$d of %2$d…</string>
+    <string name="media_quick_video_to_gif">Create GIF from video</string>
 </resources>

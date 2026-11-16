@@ -55,4 +55,15 @@
     <string name="media_quick_export">Exportar ZIP</string>
     <string name="media_quick_models">Ajustes del modelo IA offline</string>
     <string name="media_quick_remove_fluent">Quitar paquete Fluent 3D</string>
+    <string name="media_video_gif_title">Crear GIF desde vídeo</string>
+    <string name="media_video_gif_limits">Selecciona un clip de hasta 15 segundos, 320 px, 60 fotogramas y 24 MiB. Exportación local.</string>
+    <string name="media_video_choose">Elegir vídeo</string>
+    <string name="media_video_ready">Vídeo seleccionado. Configura el recorte y crea el GIF.</string>
+    <string name="media_video_start">Segundo de inicio</string>
+    <string name="media_video_duration">Duración (segundos, máximo 15)</string>
+    <string name="media_video_fps">Fotogramas por segundo (4–10)</string>
+    <string name="media_video_create">Crear y guardar GIF</string>
+    <string name="media_video_invalid">Fragmento de vídeo inválido o formato no compatible</string>
+    <string name="media_video_progress">Codificando fotograma %1$d de %2$d…</string>
+    <string name="media_quick_video_to_gif">Crear GIF desde vídeo</string>
 </resources>

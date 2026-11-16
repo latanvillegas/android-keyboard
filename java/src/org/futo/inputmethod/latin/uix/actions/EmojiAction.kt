@@ -128,6 +128,7 @@ import org.futo.inputmethod.latin.uix.actions.media.MediaHubAction
 import org.futo.inputmethod.latin.uix.actions.media.MediaImportActivity
 import org.futo.inputmethod.latin.uix.actions.media.StickerEditorActivity
 import org.futo.inputmethod.latin.uix.actions.media.GifEditorActivity
+import org.futo.inputmethod.latin.uix.actions.media.VideoGifCreatorActivity
 import org.futo.inputmethod.latin.uix.actions.media.SharedMediaGallery
 import org.futo.inputmethod.latin.uix.actions.media.MediaShelf
 import org.futo.inputmethod.latin.uix.actions.media.EmojiMediaNavigation
@@ -1384,6 +1385,17 @@ val EmojiAction = Action(
                                     manager.getContext().startActivity(
                                         android.content.Intent(
                                             manager.getContext(), StickerEditorActivity::class.java
+                                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.media_quick_video_to_gif)) },
+                                onClick = {
+                                    createMenu.value = false
+                                    manager.getContext().startActivity(
+                                        android.content.Intent(
+                                            manager.getContext(), VideoGifCreatorActivity::class.java
                                         ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                     )
                                 }

@@ -122,6 +122,12 @@
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
 
         <activity
+            android:name=".uix.actions.media.VideoGifCreatorActivity"
+            android:label="@string/media_video_gif_title"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+
+        <activity
             android:name=".uix.actions.media.MediaMetadataActivity"
             android:label="@string/media_metadata_title"
             android:exported="false"
