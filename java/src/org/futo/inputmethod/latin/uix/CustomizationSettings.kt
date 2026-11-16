@@ -36,3 +36,13 @@ val EmojiReliefSetting = SettingsKey(
 val ReduceVisualEffectsSetting = SettingsKey(
     booleanPreferencesKey("reduce_visual_effects"), false
 )
+
+/** IA button accessibility, independent from custom theme definitions. */
+val AiQuickButtonVisibleSetting = SettingsKey(
+    booleanPreferencesKey("ai_quick_button_visible"), true
+)
+
+/** 0 = inherit theme; 1 = purple; 2 = RGB; 3 = embossed theme relief. */
+val AiQuickButtonAppearanceSetting = SettingsKey(
+    intPreferencesKey("ai_quick_button_appearance"), 0
+)

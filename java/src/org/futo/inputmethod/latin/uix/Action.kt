@@ -54,6 +54,9 @@ enum class TutorialMode {
 
 interface KeyboardManagerForAction {
     fun getContext(): Context
+
+    /** Editor metadata only; never access or transmit password content. */
+    fun isSensitiveInputField(): Boolean = false
     fun getLifecycleScope(): LifecycleCoroutineScope
 
     fun createInputTransaction(): ActionInputTransaction
