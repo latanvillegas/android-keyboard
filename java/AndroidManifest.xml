@@ -108,6 +108,20 @@
         </activity>
 
         <activity
+            android:name=".uix.actions.media.AiVariantManagerActivity"
+            android:label="@string/ai_variant_manage_title"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+
+        <activity
+            android:name=".uix.actions.media.AiLongTextActivity"
+            android:label="@string/ai_draft_editor_title"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+
+        <activity
             android:name=".uix.actions.media.MediaImportActivity"
             android:label="@string/media_import"
             android:exported="false"
