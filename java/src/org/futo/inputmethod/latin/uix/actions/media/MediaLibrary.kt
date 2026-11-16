@@ -305,7 +305,7 @@ internal object MediaLibrary {
                 ?: throw IOException("Media item not found")
             val revised = previous.copy(
                 displayName = normalizeName(name),
-                tags = tags.split(',', ';', '\\n').map { it.trim().take(32) }
+                tags = tags.split(',', ';', '\n').map { it.trim().take(32) }
                     .filter { it.isNotBlank() }.distinct().take(12),
                 collection = collection.trim().take(48),
                 contentType = if (previous.kind == MediaKind.GIF)
