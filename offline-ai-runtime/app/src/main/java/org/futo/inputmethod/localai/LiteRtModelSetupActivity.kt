@@ -79,6 +79,13 @@ class LiteRtModelSetupActivity : Activity() {
         }
         panel.addView(pickButton)
         panel.addView(Button(this).apply {
+            text = "PROBAR MOTOR QWEN Y MOSTRAR ERROR"
+            setOnClickListener {
+                startActivity(Intent(this@LiteRtModelSetupActivity,
+                    LiteRtDiagnosticActivity::class.java))
+            }
+        })
+        panel.addView(Button(this).apply {
             text = "Remove LiteRT model (preserve MediaPipe .task)"
             setOnClickListener {
                 status.text = if (model.isFile && model.delete()) {
