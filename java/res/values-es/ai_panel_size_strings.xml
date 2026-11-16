@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="custom_ai_prompt_editor_height">Altura del cuadro de texto IA</string>
+    <string name="custom_ai_prompt_editor_height_desc">Ajusta la altura de Texto para procesar en el asistente IA. Toca el número para escribir un tamaño exacto en dp.</string>
+</resources>

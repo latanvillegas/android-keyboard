@@ -99,6 +99,7 @@ import org.futo.inputmethod.latin.uix.AndroidTextInput
 import org.futo.inputmethod.latin.uix.BasicThemeProvider
 import org.futo.inputmethod.latin.uix.KeyHintsSetting
 import org.futo.inputmethod.latin.uix.SuggestionBarHeightSetting
+import org.futo.inputmethod.latin.uix.AiPromptEditorHeightSetting
 import org.futo.inputmethod.latin.uix.SuggestionFontSizeSetting
 import org.futo.inputmethod.latin.uix.ActionIconScaleSetting
 import org.futo.inputmethod.latin.uix.KeyLabelScaleSetting
@@ -246,6 +247,15 @@ fun ResizeScreen(navController: NavHostController = rememberNavController()) {
                 setting = SuggestionBarHeightSetting,
                 range = 28.0f..120.0f,
                 hardRange = 24.0f..200.0f,
+                transform = { it.roundToInt() },
+                indicator = { "$it dp" }
+            )
+            SettingSlider(
+                title = stringResource(R.string.custom_ai_prompt_editor_height),
+                subtitle = stringResource(R.string.custom_ai_prompt_editor_height_desc),
+                setting = AiPromptEditorHeightSetting,
+                range = 48.0f..180.0f,
+                hardRange = 40.0f..240.0f,
                 transform = { it.roundToInt() },
                 indicator = { "$it dp" }
             )

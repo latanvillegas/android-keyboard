@@ -37,6 +37,11 @@ val ReduceVisualEffectsSetting = SettingsKey(
     booleanPreferencesKey("reduce_visual_effects"), false
 )
 
+/** Height in dp of the editor inside the offline AI action panel, not the keyboard keys. */
+val AiPromptEditorHeightSetting = SettingsKey(
+    intPreferencesKey("custom_ai_prompt_editor_height_dp"), 72
+)
+
 /** IA button accessibility, independent from custom theme definitions. */
 val AiQuickButtonVisibleSetting = SettingsKey(
     booleanPreferencesKey("ai_quick_button_visible"), true

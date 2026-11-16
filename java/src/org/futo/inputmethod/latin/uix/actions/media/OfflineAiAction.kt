@@ -9,11 +9,13 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -32,6 +34,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
+import org.futo.inputmethod.latin.uix.AiPromptEditorHeightSetting
+import org.futo.inputmethod.latin.uix.settings.useDataStoreValue
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.futo.inputmethod.latin.R
@@ -103,6 +109,34 @@ private enum class AiOperation(val instruction: String) {
     FORMAL("Rewrite in a professional and formal style.")
 }
 
+
+/**
+ * An equal-weight cell fills its share of the entire panel width.
+ * The short two-line label avoids a third row on narrow screens.
+ */
+@Composable
+private fun RowScope.AiActionCell(
+    title: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp)
+    ) {
+        Text(
+            title,
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelMedium,
+            fontSize = 13.sp,
+            lineHeight = 15.sp,
+            maxLines = 2
+        )
+    }
+}
+
 @Composable
 private fun OfflineAiPanel(manager: KeyboardManagerForAction) {
     val context = LocalContext.current
@@ -114,6 +148,33 @@ private fun OfflineAiPanel(manager: KeyboardManagerForAction) {
     var busy by remember { mutableStateOf(false) }
     var targetSession by remember { mutableStateOf<Any?>(null) }
     val quickOperation = remember { AiQuickLaunch.consume() }
+    val editorHeight = useDataStoreValue(AiPromptEditorHeightSetting).coerceIn(40, 240)
+
+    // Preserve the original editor-session check before permitting insertion
+    // into the application after asynchronous on-device generation.
+    val runPrompt: (String, Boolean) -> Unit = { prompt, diagnostic ->
+        if (!busy) {
+            targetSession = if (diagnostic) null else manager.captureEditorSession()
+            busy = true
+            output = ""
+            error = ""
+            scope.launch {
+                try {
+                    output = LocalAiClient.generate(context, prompt)
+                    if (output.isBlank()) {
+                        error = context.getString(R.string.local_ai_empty_response)
+                    }
+                } catch (cause: Exception) {
+                    val details = cause.localizedMessage ?: cause.javaClass.simpleName
+                    error = if (diagnostic) {
+                        context.getString(R.string.local_ai_test_failed) + ": " + details
+                    } else details
+                } finally {
+                    busy = false
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -124,7 +185,7 @@ private fun OfflineAiPanel(manager: KeyboardManagerForAction) {
         // its own IME input. FUTO ActionTextEditor supplies an InputConnection
         // override so taps and physical/software keys reach this editor.
         Surface(
-            modifier = Modifier.fillMaxWidth().height(72.dp),
+            modifier = Modifier.fillMaxWidth().height(editorHeight.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
             shape = RoundedCornerShape(10.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
@@ -173,97 +234,56 @@ private fun OfflineAiPanel(manager: KeyboardManagerForAction) {
                 }
             }) { Text(stringResource(R.string.ai_quick_execute)) }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(enabled = !busy, onClick = {
-                // A fixed prompt diagnoses the runtime without reading any editor text.
-                targetSession = null
-                busy = true
-                output = ""
-                error = ""
-                scope.launch {
-                    try {
-                        output = LocalAiClient.generate(context,
-                            "Responde solo con una palabra: LISTO.")
-                        if (output.isBlank()) {
-                            error = context.getString(R.string.local_ai_empty_response)
-                        }
-                    } catch (cause: Exception) {
-                        error = context.getString(R.string.local_ai_test_failed) +
-                            ": " + (cause.localizedMessage ?: cause.javaClass.simpleName)
-                    } finally {
-                        busy = false
-                    }
+        // All seven commands share the FULL panel width in just two rows.
+        // Operations remain explicitly triggered; no automatic chat reading.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            AiActionCell(
+                stringResource(R.string.local_ai_write),
+                enabled = !busy && source.isNotBlank()
+            ) {
+                runPrompt(
+                    "Responde a la siguiente petición en español, de forma clara." +
+                        "\n\nPetición:\n" + source,
+                    false
+                )
+            }
+            for (task in listOf(
+                AiOperation.CORRECT, AiOperation.REWRITE, AiOperation.TRANSLATE
+            )) {
+                AiActionCell(
+                    stringResource(when (task) {
+                        AiOperation.CORRECT -> R.string.local_ai_correct
+                        AiOperation.REWRITE -> R.string.local_ai_rewrite
+                        else -> R.string.local_ai_translate
+                    }),
+                    enabled = !busy && source.isNotBlank()
+                ) {
+                    runPrompt(task.instruction + "\n\nText:\n" + source, false)
                 }
-            }) { Text(stringResource(R.string.local_ai_test_engine)) }
-
-            TextButton(enabled = !busy && source.isNotBlank(), onClick = {
-                val token = manager.captureEditorSession()
-                targetSession = token
-                busy = true
-                output = ""
-                error = ""
-                scope.launch {
-                    try {
-                        output = LocalAiClient.generate(context,
-                            "Responde a la siguiente petición en español, de forma clara." +
-                            "\n\nPetición:\n" + source)
-                        if (output.isBlank()) {
-                            error = context.getString(R.string.local_ai_empty_response)
-                        }
-                    } catch (cause: Exception) {
-                        error = cause.localizedMessage ?: cause.javaClass.simpleName
-                    } finally {
-                        busy = false
-                    }
-                }
-            }) { Text(stringResource(R.string.local_ai_write)) }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            for (task in listOf(AiOperation.CORRECT, AiOperation.REWRITE,
-                AiOperation.TRANSLATE)) {
-                TextButton(enabled = !busy && source.isNotBlank(), onClick = {
-                    val token = manager.captureEditorSession()
-                    targetSession = token
-                    busy = true
-                    output = ""
-                    error = ""
-                    scope.launch {
-                        try {
-                            output = LocalAiClient.generate(context,
-                                task.instruction + "\n\nText:\n" + source)
-                        } catch (cause: Exception) {
-                            error = cause.message ?: "Local model unavailable"
-                        } finally {
-                            busy = false
-                        }
-                    }
-                }) { Text(stringResource(when (task) {
-                    AiOperation.CORRECT -> R.string.local_ai_correct
-                    AiOperation.REWRITE -> R.string.local_ai_rewrite
-                    else -> R.string.local_ai_translate
-                })) }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
             for (task in listOf(AiOperation.SUMMARIZE, AiOperation.FORMAL)) {
-                TextButton(enabled = !busy && source.isNotBlank(), onClick = {
-                    val token = manager.captureEditorSession()
-                    targetSession = token
-                    busy = true
-                    output = ""
-                    error = ""
-                    scope.launch {
-                        try {
-                            output = LocalAiClient.generate(context,
-                                task.instruction + "\n\nText:\n" + source)
-                        } catch (cause: Exception) {
-                            error = cause.message ?: "Local model unavailable"
-                        } finally {
-                            busy = false
-                        }
-                    }
-                }) { Text(stringResource(if (task == AiOperation.SUMMARIZE)
-                    R.string.local_ai_summarize else R.string.local_ai_formal)) }
+                AiActionCell(
+                    stringResource(if (task == AiOperation.SUMMARIZE) {
+                        R.string.local_ai_summarize
+                    } else R.string.local_ai_formal),
+                    enabled = !busy && source.isNotBlank()
+                ) {
+                    runPrompt(task.instruction + "\n\nText:\n" + source, false)
+                }
+            }
+            AiActionCell(
+                stringResource(R.string.local_ai_test_engine),
+                enabled = !busy
+            ) {
+                runPrompt("Responde solo con una palabra: LISTO.", true)
             }
         }
         if (busy) Text(stringResource(R.string.local_ai_busy))
