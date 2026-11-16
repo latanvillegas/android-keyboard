@@ -105,8 +105,10 @@ class LiteRtDiagnosticActivity : Activity() {
             }
             addView(status)
         }
+        // Keep results near the heading; a weighted panel previously filled
+        // almost the entire screen with whitespace.
         root.addView(statusScroll, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(220)
         ).apply { bottomMargin = dp(16) })
 
         testButton = Button(this).apply {
