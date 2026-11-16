@@ -42,6 +42,20 @@ val AiPromptEditorHeightSetting = SettingsKey(
     intPreferencesKey("custom_ai_prompt_editor_height_dp"), 72
 )
 
+/** 0: automatic, 1: fixed manual height, 2: hybrid with user min/max. */
+val AiEditorGrowthModeSetting = SettingsKey(
+    intPreferencesKey("ai_editor_growth_mode"), 0
+)
+
+/** Hybrid editor minimum and maximum heights; never affect keyboard keys. */
+val AiEditorMinHeightSetting = SettingsKey(
+    intPreferencesKey("ai_editor_min_height_dp"), 52
+)
+
+val AiEditorMaxHeightSetting = SettingsKey(
+    intPreferencesKey("ai_editor_max_height_dp"), 220
+)
+
 /** IA button accessibility, independent from custom theme definitions. */
 val AiQuickButtonVisibleSetting = SettingsKey(
     booleanPreferencesKey("ai_quick_button_visible"), true
