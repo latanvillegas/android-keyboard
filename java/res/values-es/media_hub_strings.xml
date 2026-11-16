@@ -55,5 +55,10 @@
     <string name="local_ai_insert">Insertar</string>
     <string name="local_ai_editor_changed">Cambió el campo de escritura.</string>
     <string name="local_ai_install_runtime">Instala el APK complementario de IA offline.</string>
+    <string name="local_ai_usage_hint">Escribe la petición en este campo, no en el chat de la aplicación. Para comprobar si Qwen funciona, pulsa Probar IA sin escribir nada.</string>
+    <string name="local_ai_test_engine">Probar IA</string>
+    <string name="local_ai_write">Escribir / Responder</string>
+    <string name="local_ai_test_failed">Falló la prueba del motor IA</string>
+    <string name="local_ai_empty_response">El motor IA no devolvió texto.</string>
     <string name="local_ai_models">Configurar modelo IA offline</string>
 </resources>

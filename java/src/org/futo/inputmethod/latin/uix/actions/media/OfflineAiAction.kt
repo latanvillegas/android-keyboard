@@ -91,6 +91,53 @@ private fun OfflineAiPanel(manager: KeyboardManagerForAction) {
             modifier = Modifier.fillMaxWidth(),
             maxLines = 4
         )
+        Text(stringResource(R.string.local_ai_usage_hint),
+            style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TextButton(enabled = !busy, onClick = {
+                // A fixed prompt diagnoses the runtime without reading any editor text.
+                targetSession = null
+                busy = true
+                output = ""
+                error = ""
+                scope.launch {
+                    try {
+                        output = LocalAiClient.generate(context,
+                            "Responde solo con una palabra: LISTO.")
+                        if (output.isBlank()) {
+                            error = context.getString(R.string.local_ai_empty_response)
+                        }
+                    } catch (cause: Exception) {
+                        error = context.getString(R.string.local_ai_test_failed) +
+                            ": " + (cause.localizedMessage ?: cause.javaClass.simpleName)
+                    } finally {
+                        busy = false
+                    }
+                }
+            }) { Text(stringResource(R.string.local_ai_test_engine)) }
+
+            TextButton(enabled = !busy && source.isNotBlank(), onClick = {
+                val token = manager.captureEditorSession()
+                targetSession = token
+                busy = true
+                output = ""
+                error = ""
+                scope.launch {
+                    try {
+                        output = LocalAiClient.generate(context,
+                            "Responde a la siguiente petición en español, de forma clara." +
+                            "\n\nPetición:\n" + source)
+                        if (output.isBlank()) {
+                            error = context.getString(R.string.local_ai_empty_response)
+                        }
+                    } catch (cause: Exception) {
+                        error = cause.localizedMessage ?: cause.javaClass.simpleName
+                    } finally {
+                        busy = false
+                    }
+                }
+            }) { Text(stringResource(R.string.local_ai_write)) }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             for (task in listOf(AiOperation.CORRECT, AiOperation.REWRITE,
                 AiOperation.TRANSLATE)) {
