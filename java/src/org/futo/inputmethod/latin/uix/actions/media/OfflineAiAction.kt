@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.futo.inputmethod.latin.R
+import java.util.concurrent.atomic.AtomicReference
 import org.futo.inputmethod.latin.uix.Action
 import org.futo.inputmethod.latin.uix.ActionWindow
 import org.futo.inputmethod.latin.uix.ActionTextEditor
@@ -70,6 +71,30 @@ val OfflineAiAction = Action(
     }
 )
 
+
+/** Operation preselected by the one-row IA shortcut's long-press menu. */
+enum class AiQuickMode(val titleRes: Int, val instruction: String) {
+    ANSWER(R.string.local_ai_write,
+        "Responde de manera clara y breve a esta petición en español."),
+    CORRECT(R.string.local_ai_correct,
+        "Correct spelling and grammar without changing meaning."),
+    REWRITE(R.string.local_ai_rewrite,
+        "Rewrite naturally and clearly while retaining original meaning."),
+    TRANSLATE(R.string.local_ai_translate,
+        "Translate into Spanish, or English when the input is in Spanish."),
+    SUMMARIZE(R.string.local_ai_summarize,
+        "Summarize accurately in two short sentences."),
+    FORMAL(R.string.local_ai_formal,
+        "Rewrite the text in a formal professional style.")
+}
+
+/** One-shot operation hand-off from shortcut menu to a fresh action window. */
+object AiQuickLaunch {
+    private val pending = AtomicReference<AiQuickMode?>(null)
+    fun enqueue(operation: AiQuickMode) { pending.set(operation) }
+    fun consume(): AiQuickMode? = pending.getAndSet(null)
+}
+
 private enum class AiOperation(val instruction: String) {
     CORRECT("Correct spelling and grammar without changing meaning."),
     REWRITE("Rewrite clearly and naturally, retaining the original meaning."),
@@ -88,6 +113,7 @@ private fun OfflineAiPanel(manager: KeyboardManagerForAction) {
     var error by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var targetSession by remember { mutableStateOf<Any?>(null) }
+    val quickOperation = remember { AiQuickLaunch.consume() }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -119,6 +145,34 @@ private fun OfflineAiPanel(manager: KeyboardManagerForAction) {
             stringResource(R.string.local_ai_usage_hint),
             style = MaterialTheme.typography.bodySmall
         )
+        if (quickOperation != null) {
+            Text(
+                stringResource(R.string.ai_quick_selected_operation,
+                    stringResource(quickOperation.titleRes)),
+                style = MaterialTheme.typography.bodySmall
+            )
+            TextButton(enabled = !busy && source.isNotBlank(), onClick = {
+                targetSession = manager.captureEditorSession()
+                busy = true
+                output = ""
+                error = ""
+                scope.launch {
+                    try {
+                        output = LocalAiClient.generate(
+                            context,
+                            quickOperation.instruction + "\n\nTexto:\n" + source
+                        )
+                        if (output.isBlank()) {
+                            error = context.getString(R.string.local_ai_empty_response)
+                        }
+                    } catch (cause: Exception) {
+                        error = cause.localizedMessage ?: cause.javaClass.simpleName
+                    } finally {
+                        busy = false
+                    }
+                }
+            }) { Text(stringResource(R.string.ai_quick_execute)) }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             TextButton(enabled = !busy, onClick = {
                 // A fixed prompt diagnoses the runtime without reading any editor text.
