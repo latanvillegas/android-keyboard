@@ -477,7 +477,8 @@ private fun OfflineAiPanel(manager: KeyboardManagerForAction) {
         }
         if (output.isNotBlank()) {
             Text(stringResource(R.string.local_ai_preview))
-            Text(output.take(12000))
+            // Never silently truncate the combined result of long-text chunks.
+            Text(output)
             Row {
                 Button(onClick = {
                     val clipboard = context.getSystemService(
