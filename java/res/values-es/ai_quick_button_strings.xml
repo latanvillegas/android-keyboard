@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_quick_button_visible">Mostrar botón IA junto al micrófono</string>
+    <string name="ai_quick_button_visible_description">Acceso IA en la misma fila de sugerencias, sin altura adicional. Oculto en campos sensibles.</string>
+    <string name="ai_quick_button_appearance">Aspecto del botón IA</string>
+    <string name="ai_quick_button_appearance_description">Seguir tu tema del teclado o personalizar solo este botón</string>
+    <string name="ai_quick_button_theme">Seguir tema del teclado</string>
+    <string name="ai_quick_button_purple">Degradado morado</string>
+    <string name="ai_quick_button_rgb">Arcoíris RGB animado</string>
+    <string name="ai_quick_button_relief">Relieve 3D con colores del tema</string>
+    <string name="ai_quick_choose_operation">Elige una operación rápida de IA y escribe la petición en el editor.</string>
+    <string name="ai_quick_selected_operation">Operación rápida: %1$s</string>
+    <string name="ai_quick_execute">Ejecutar operación</string>
+</resources>

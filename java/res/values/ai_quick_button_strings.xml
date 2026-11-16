@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_quick_button_visible">Show IA shortcut beside the microphone</string>
+    <string name="ai_quick_button_visible_description">AI in the same suggestion row, with no extra height. Hidden in sensitive text fields.</string>
+    <string name="ai_quick_button_appearance">IA button appearance</string>
+    <string name="ai_quick_button_appearance_description">Follow your keyboard theme or customize only this button</string>
+    <string name="ai_quick_button_theme">Follow keyboard theme</string>
+    <string name="ai_quick_button_purple">Purple gradient</string>
+    <string name="ai_quick_button_rgb">Animated RGB rainbow</string>
+    <string name="ai_quick_button_relief">3D relief using theme colors</string>
+    <string name="ai_quick_choose_operation">Choose a quick AI action; type your request in the editor.</string>
+    <string name="ai_quick_selected_operation">Quick action: %1$s</string>
+    <string name="ai_quick_execute">Run quick action</string>
+</resources>
