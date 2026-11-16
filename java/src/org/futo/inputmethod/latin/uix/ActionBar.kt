@@ -1165,7 +1165,8 @@ private fun AiQuickAccessButton(
                                 AiQuickMode.REWRITE,
                                 AiQuickMode.TRANSLATE,
                                 AiQuickMode.SUMMARIZE,
-                                AiQuickMode.FORMAL
+                                AiQuickMode.FORMAL,
+                                AiQuickMode.INFORMAL
                             )
                             manager.requestDialog(
                                 text = context.getString(R.string.ai_quick_choose_operation),

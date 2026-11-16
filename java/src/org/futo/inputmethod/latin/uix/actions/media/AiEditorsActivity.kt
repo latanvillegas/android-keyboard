@@ -139,6 +139,7 @@ class AiLongTextActivity : Activity() {
 class AiVariantManagerActivity : Activity() {
     companion object {
         const val EXTRA_CATEGORY = "category"
+        const val EXTRA_CREATE = "create_variant"
     }
 
     private val repo by lazy { AiVariantStore(applicationContext) }
@@ -155,6 +156,10 @@ class AiVariantManagerActivity : Activity() {
         }.getOrDefault(AiCategory.REWRITE)
         title = getString(R.string.ai_variant_manage_title)
         render()
+        if (savedInstanceState == null &&
+            intent.getBooleanExtra(EXTRA_CREATE, false)) {
+            root.post { if (!isFinishing) editDialog(null) }
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
