@@ -11,8 +11,10 @@
         android:label="FUTO Local AI Runtime"
         android:allowBackup="false"
         android:supportsRtl="true">
+        <!-- If a native LiteRT engine crashes, the setup UI and FUTO IME survive. -->
         <service
             android:name=".LocalAiService"
+            android:process=":inference"
             android:exported="true"
             android:permission="org.futo.inputmethod.latin.permission.LOCAL_AI" />
         <activity
