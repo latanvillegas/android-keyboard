@@ -91,8 +91,14 @@ val OfflineAiAction = Action(
 )
 
 /** Long-press IA actions open the matching variants, not an older fixed prompt. */
-enum class AiQuickMode {
-    ANSWER, CORRECT, REWRITE, TRANSLATE, SUMMARIZE, FORMAL, INFORMAL
+enum class AiQuickMode(val titleRes: Int) {
+    ANSWER(R.string.ai_nav_answer),
+    CORRECT(R.string.local_ai_correct),
+    REWRITE(R.string.local_ai_rewrite),
+    TRANSLATE(R.string.local_ai_translate),
+    SUMMARIZE(R.string.local_ai_summarize),
+    FORMAL(R.string.local_ai_formal),
+    INFORMAL(R.string.ai_nav_informal)
 }
 
 object AiQuickLaunch {
