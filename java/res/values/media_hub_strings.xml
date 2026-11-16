@@ -55,7 +55,7 @@
     <string name="local_ai_insert">Insert</string>
     <string name="local_ai_editor_changed">Editor focus changed.</string>
     <string name="local_ai_install_runtime">Install the separately signed Offline AI runtime APK.</string>
-    <string name="local_ai_usage_hint">Write a request in this field, not the app's chat box. To check whether the downloaded model actually runs, press Test AI — no text is needed.</string>
+    <string name="local_ai_usage_hint">Write a request in this field, not in the chat box of the current app. To check whether the downloaded model actually runs, press Test AI — no text is needed.</string>
     <string name="local_ai_test_engine">Test AI</string>
     <string name="local_ai_write">Write / Answer</string>
     <string name="local_ai_test_failed">Local AI test failed</string>
