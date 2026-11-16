@@ -100,6 +100,13 @@ class StickerEditorActivity : ComponentActivity() {
             maxLines = 2
         }
         layout.addView(caption)
+        layout.addView(
+            MediaAiCaptionHelper.button(this, caption, "sticker"),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
         saveButton = Button(this).apply {
             text = getString(R.string.media_save_sticker)
             isEnabled = false

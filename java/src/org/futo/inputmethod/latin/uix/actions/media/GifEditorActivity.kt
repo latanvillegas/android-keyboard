@@ -134,6 +134,13 @@ class GifEditorActivity : ComponentActivity() {
             maxLines = 2
         }
         root.addView(caption)
+        root.addView(
+            MediaAiCaptionHelper.button(this, caption, "GIF"),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
         status = title(R.string.gif_editor_tip)
         root.addView(status)
         save = Button(this).apply {
