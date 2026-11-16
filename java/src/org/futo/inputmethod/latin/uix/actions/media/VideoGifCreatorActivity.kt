@@ -156,7 +156,7 @@ class VideoGifCreatorActivity : ComponentActivity() {
         }
     }
 
-    private fun render(
+    private suspend fun render(
         uri: Uri,
         offsetMs: Long,
         lengthMs: Long,
@@ -176,8 +176,8 @@ class VideoGifCreatorActivity : ComponentActivity() {
             val height = retriever.extractMetadata(
                 MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT
             )?.toIntOrNull() ?: 0
-            if (totalMs <= 100 || offsetMs !in 0 until totalMs ||
-                lengthMs !in 100..15000 || fps !in 4..10 ||
+            if (totalMs <= 100 || (offsetMs < 0L || offsetMs >= totalMs) ||
+                lengthMs !in 100L..15000L || fps !in 4..10 ||
                 width !in 1..4096 || height !in 1..4096 ||
                 (Build.VERSION.SDK_INT < 27 && (width > 1920 || height > 1920))) {
                 throw IOException("Unsupported source dimensions, time range or frame rate")
