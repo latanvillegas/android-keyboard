@@ -58,10 +58,18 @@ class LocalAiService : Service() {
                         val folder = File(filesDir, "llm")
                         val liteRt = File(folder, "model.litertlm")
                         val result = if (liteRt.isFile) {
-                            // User-imported LiteRT Qwen takes precedence. Removing it
-                            // falls back to the existing MediaPipe .task backend.
+                            // Never retain two separate multi-gigabyte inference engines.
+                            // The serial executor owns both engines and their shutdown.
+                            val previous = engine
+                            engine = null
+                            activeStamp = -1L
+                            if (previous != null) {
+                                try { previous.close() } catch (_: Exception) { }
+                            }
                             liteRtEngine.generate(liteRt, prompt)
                         } else {
+                            // Removing model.litertlm restores the MediaPipe backend.
+                            liteRtEngine.close()
                             val model = File(folder, "model.task")
                             if (!model.isFile || model.length() < 1024)
                                 throw IllegalStateException(
