@@ -1,6 +1,12 @@
 package org.futo.inputmethod.localai
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.view.ViewGroup
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -25,6 +31,7 @@ import java.io.File
 class LiteRtDiagnosticActivity : Activity() {
     private val ui = Handler(Looper.getMainLooper())
     private lateinit var status: TextView
+    private lateinit var statusScroll: ScrollView
     private lateinit var testButton: Button
     private var boundConnection: ServiceConnection? = null
     private var bound = false
@@ -32,34 +39,113 @@ class LiteRtDiagnosticActivity : Activity() {
     private var pendingToken = 0L
     private val model get() = File(File(filesDir, "llm"), "model.litertlm")
 
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density + 0.5f).toInt()
+
+    private fun showStatus(message: String) {
+        status.text = message
+        statusScroll.post { statusScroll.scrollTo(0, 0) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val panel = LinearLayout(this).apply {
+        actionBar?.title = "Diagnóstico Qwen - FUTO"
+
+        val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 36, 32, 36)
+            setPadding(dp(20), dp(20), dp(20), dp(16))
+            setBackgroundColor(Color.rgb(248, 249, 252))
+            isFocusableInTouchMode = true
         }
-        panel.addView(TextView(this).apply {
-            text = "Diagnóstico de IA Qwen sin conexión"
-            textSize = 21f
-        })
+
+        root.addView(TextView(this).apply {
+            text = "Diagnóstico de IA Qwen"
+            textSize = 22f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.rgb(29, 36, 49))
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(8) })
+
+        root.addView(TextView(this).apply {
+            text = "Prueba local sin red. El resultado aparecerá completo aquí."
+            textSize = 14f
+            setTextColor(Color.rgb(75, 82, 93))
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(18) })
+
+        root.addView(TextView(this).apply {
+            text = "RESULTADO DEL MOTOR"
+            textSize = 13f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.rgb(35, 62, 123))
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(8) })
+
         status = TextView(this).apply {
             textSize = 16f
+            setTextColor(Color.rgb(29, 36, 49))
             text = modelStatus()
-            setPadding(0, 16, 0, 22)
+            setPadding(dp(16), dp(18), dp(16), dp(18))
+            setTextIsSelectable(true)
         }
-        panel.addView(status)
+
+        statusScroll = ScrollView(this).apply {
+            isFillViewport = true
+            isFocusable = false
+            background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = dp(12).toFloat()
+                setStroke(dp(1), Color.rgb(215, 223, 234))
+            }
+            addView(status)
+        }
+        root.addView(statusScroll, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+        ).apply { bottomMargin = dp(16) })
+
         testButton = Button(this).apply {
             text = "PROBAR MOTOR QWEN AHORA"
+            isAllCaps = false
+            textSize = 16f
             setOnClickListener { testInference() }
         }
-        panel.addView(testButton)
-        panel.addView(TextView(this).apply {
-            text = "Esta prueba envía una petición fija al mismo servicio que usa FUTO. " +
-                "No lee chats, contraseñas ni otro texto. " +
-                "La primera generación puede tardar al cargar 1,6 GB de modelo."
-            textSize = 14f
-        })
-        setContentView(ScrollView(this).apply { addView(panel) })
+        root.addView(testButton, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(54)
+        ).apply { bottomMargin = dp(8) })
+
+        root.addView(Button(this).apply {
+            text = "Copiar diagnóstico"
+            isAllCaps = false
+            setOnClickListener {
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(
+                    ClipData.newPlainText("Diagnóstico Qwen FUTO", status.text.toString())
+                )
+                android.widget.Toast.makeText(this@LiteRtDiagnosticActivity,
+                    "Diagnóstico copiado", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(48)
+        ).apply { bottomMargin = dp(12) })
+
+        root.addView(TextView(this).apply {
+            text = "No descarga ni borra el modelo de 1,6 GB. " +
+                "La primera generación puede tardar debido a su carga en memoria."
+            textSize = 13f
+            setTextColor(Color.rgb(75, 82, 93))
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
+
+        setContentView(root)
+        root.requestFocus()
     }
 
     private fun modelStatus(): String {
@@ -80,8 +166,8 @@ class LiteRtDiagnosticActivity : Activity() {
             return
         }
         testButton.isEnabled = false
-        status.text = "Modelo encontrado (" + (model.length() / 1048576) +
-            " MiB). Inicializando LiteRT-LM y generando respuesta local..."
+        showStatus("Modelo encontrado (" + (model.length() / 1048576) +
+            " MiB). Inicializando LiteRT-LM y generando respuesta local...")
         val token = System.nanoTime()
         pendingToken = token
         val reply = Messenger(Handler(Looper.getMainLooper()) { message ->
@@ -169,7 +255,7 @@ class LiteRtDiagnosticActivity : Activity() {
         bound = false
         boundConnection = null
         if (!isFinishing && !isDestroyed) {
-            status.text = result
+            showStatus(result)
             testButton.isEnabled = true
         }
     }
