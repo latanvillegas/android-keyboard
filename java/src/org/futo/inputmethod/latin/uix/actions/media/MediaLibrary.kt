@@ -19,13 +19,24 @@ import java.io.InputStream
 import java.security.MessageDigest
 
 /** Persistent user-owned files: never bundled into the APK or re-encoded on import. */
+internal enum class MediaContentType { GIF, STICKER, IMAGE }
+
+/** Shared catalog metadata used by the emoji picker and the media manager. */
 internal data class MediaItem(
     val id: String,
     val kind: MediaKind,
     val displayName: String,
     val length: Long,
     val createdAt: Long,
-    val favorite: Boolean
+    val favorite: Boolean,
+    val contentType: MediaContentType = when (kind) {
+        MediaKind.GIF -> MediaContentType.GIF
+        MediaKind.JPEG -> MediaContentType.IMAGE
+        else -> MediaContentType.STICKER
+    },
+    val tags: List<String> = emptyList(),
+    val collection: String = "",
+    val lastUsedAt: Long = 0L
 )
 
 internal object MediaLibrary {
@@ -76,7 +87,27 @@ internal object MediaLibrary {
                 displayName = normalizeName(obj.getString("name")),
                 length = obj.getLong("bytes"),
                 createdAt = obj.getLong("createdAt"),
-                favorite = obj.optBoolean("favorite", false)
+                favorite = obj.optBoolean("favorite", false),
+                contentType = runCatching {
+                    MediaContentType.valueOf(obj.optString("type").ifBlank {
+                        when (kind) {
+                            MediaKind.GIF -> "GIF"
+                            MediaKind.JPEG -> "IMAGE"
+                            else -> "STICKER"
+                        }
+                    })
+                }.getOrDefault(when (kind) {
+                    MediaKind.GIF -> MediaContentType.GIF
+                    MediaKind.JPEG -> MediaContentType.IMAGE
+                    else -> MediaContentType.STICKER
+                }),
+                tags = obj.optJSONArray("tags")?.let { arr ->
+                    (0 until minOf(arr.length(), 12)).mapNotNull { index ->
+                        arr.optString(index).trim().take(32).takeIf(String::isNotEmpty)
+                    }
+                } ?: emptyList(),
+                collection = obj.optString("collection").trim().take(48),
+                lastUsedAt = obj.optLong("lastUsedAt", 0L)
             )
         }
     }
@@ -93,6 +124,10 @@ internal object MediaLibrary {
                 put("bytes", item.length)
                 put("createdAt", item.createdAt)
                 put("favorite", item.favorite)
+                put("type", item.contentType.name)
+                put("tags", JSONArray(item.tags))
+                put("collection", item.collection)
+                put("lastUsedAt", item.lastUsedAt)
             })
         }
         val file = catalog(context)
@@ -239,6 +274,48 @@ internal object MediaLibrary {
                 changes.tryEmit(Unit)
             }
         }
+
+    /**
+     * A successful media send updates the same shared recents list.
+     * No message content or target application metadata is persisted.
+     */
+    suspend fun markUsed(context: Context, id: String) = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            val current = entries(context)
+            if (current.none { it.id == id }) return@synchronized
+            write(context, current.map {
+                if (it.id == id) it.copy(lastUsedAt = System.currentTimeMillis()) else it
+            })
+            changes.tryEmit(Unit)
+        }
+    }
+
+    /** Metadata-only update: imported image bytes are NEVER rewritten. */
+    suspend fun updateMetadata(
+        context: Context,
+        id: String,
+        name: String,
+        tags: String,
+        collection: String,
+        contentType: MediaContentType
+    ) = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            val items = entries(context)
+            val previous = items.firstOrNull { it.id == id }
+                ?: throw IOException("Media item not found")
+            val revised = previous.copy(
+                displayName = normalizeName(name),
+                tags = tags.split(',', ';', '\\n').map { it.trim().take(32) }
+                    .filter { it.isNotBlank() }.distinct().take(12),
+                collection = collection.trim().take(48),
+                contentType = if (previous.kind == MediaKind.GIF)
+                    MediaContentType.GIF else if (contentType == MediaContentType.GIF)
+                    MediaContentType.STICKER else contentType
+            )
+            write(context, items.map { if (it.id == id) revised else it })
+            changes.tryEmit(Unit)
+        }
+    }
 
     suspend fun delete(context: Context, id: String) = withContext(Dispatchers.IO) {
         synchronized(lock) {
