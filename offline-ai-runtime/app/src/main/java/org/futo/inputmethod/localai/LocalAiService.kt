@@ -29,7 +29,7 @@ class LocalAiService : Service() {
         Thread(runnable, "futo-local-inference").apply { isDaemon = true }
     }
     private var engine: LlmInference? = null
-    private val liteRtEngine = LiteRtEngine()
+    private val liteRtEngine by lazy { LiteRtEngine(applicationContext) }
     private val requestBusy = AtomicBoolean(false)
     private var activeStamp = -1L
 
