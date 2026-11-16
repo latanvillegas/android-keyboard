@@ -13,6 +13,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +37,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -120,6 +125,15 @@ import org.futo.inputmethod.latin.uix.actions.emoji.EmojiView
 import org.futo.inputmethod.latin.uix.actions.emoji.FluentEmoji3DImage
 import org.futo.inputmethod.latin.uix.actions.emoji.SmartEmojiTransport
 import org.futo.inputmethod.latin.uix.actions.media.MediaHubAction
+import org.futo.inputmethod.latin.uix.actions.media.MediaImportActivity
+import org.futo.inputmethod.latin.uix.actions.media.StickerEditorActivity
+import org.futo.inputmethod.latin.uix.actions.media.GifEditorActivity
+import org.futo.inputmethod.latin.uix.actions.media.SharedMediaGallery
+import org.futo.inputmethod.latin.uix.actions.media.MediaShelf
+import org.futo.inputmethod.latin.uix.actions.media.EmojiMediaNavigation
+import org.futo.inputmethod.latin.uix.actions.media.EmojiMediaPage
+import org.futo.inputmethod.latin.uix.actions.media.Fluent3DBrowser
+import org.futo.inputmethod.latin.uix.actions.media.FluentFavoritesStrip
 import org.futo.inputmethod.latin.uix.settings.useDataStore
 import org.futo.inputmethod.latin.uix.settings.useDataStoreValue
 import org.futo.inputmethod.latin.uix.theme.LocalCompatEmojiFamily
@@ -1199,46 +1213,128 @@ val EmojiAction = Action(
         object : ActionWindow() {
             private val searchText = mutableStateOf("")
             private val searching = mutableStateOf(false)
+            private val activeMediaPage = mutableStateOf(EmojiMediaNavigation.take())
+            private val createMenu = mutableStateOf(false)
 
             @Composable
             override fun windowName(): String {
-                return stringResource(R.string.action_emoji_title)
+                return stringResource(R.string.media_unified_title)
             }
 
             @Composable
             override fun WindowContents(keyboardShown: Boolean) {
                 val view = LocalView.current
+                val managerContext = manager.getContext()
                 val raisedEmojiStyle = useDataStoreValue(EmojiReliefSetting)
-                PersistentEmojiState.emojis.value?.let { emojis ->
-                    EmojiGrid(onClick = { item ->
-                        // A single ordered transport path handles 3D media and Unicode fallback.
-                        // Session identity is captured before any background image preparation.
-                        val editorToken = manager.captureEditorSession()
-                        manager.getLifecycleScope().launch {
-                            val result = SmartEmojiTransport.send(
-                                manager = manager,
-                                item = item,
-                                useThreeD = raisedEmojiStyle,
-                                editorToken = editorToken
-                            )
-                            if (result != SmartEmojiTransport.Result.EDITOR_CHANGED) {
-                                manager.getContext().useEmoji(item.emoji)
+                val emojis = PersistentEmojiState.emojis.value.orEmpty()
+
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // One horizontal media mode strip; original Emoji categories
+                    // and recents stay unchanged inside their normal page.
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 4.dp, vertical = 1.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        for ((option, label) in listOf(
+                            EmojiMediaPage.EMOJIS to R.string.media_tab_emoji,
+                            EmojiMediaPage.GIF to R.string.media_gifs,
+                            EmojiMediaPage.STICKERS to R.string.media_stickers,
+                            EmojiMediaPage.THREE_D to R.string.media_tab_3d,
+                            EmojiMediaPage.FAVORITES to R.string.media_favorites
+                        )) {
+                            TextButton(onClick = { activeMediaPage.value = option }) {
+                                Text(
+                                    stringResource(label),
+                                    maxLines = 1,
+                                    color = if (activeMediaPage.value == option)
+                                        MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
-                        manager.performHapticAndAudioFeedback(Constants.CODE_EMOJI, view)
-                    }, onExit = {
-                        manager.closeActionWindow()
-                        manager.performHapticAndAudioFeedback(Constants.CODE_SWITCH_ALPHA_SYMBOL, view)
-                    }, onSpace = {
-                        manager.sendCodePointEvent(Constants.CODE_SPACE)
-                        manager.performHapticAndAudioFeedback(Constants.CODE_SPACE, view)
-                    }, onBackspace = { isRepeated ->
-                        manager.backspace(1)
-                        if(!isRepeated) {
-                            manager.performHapticAndAudioFeedback(Constants.CODE_DELETE, view)
+                    }
+
+                    Box(modifier = Modifier.weight(1f)) {
+                        when (activeMediaPage.value) {
+                            EmojiMediaPage.EMOJIS -> {
+                                if (emojis.isNotEmpty()) {
+                                    EmojiGrid(
+                                        onClick = { item ->
+                                            val token = manager.captureEditorSession()
+                                            manager.getLifecycleScope().launch {
+                                                val result = SmartEmojiTransport.send(
+                                                    manager = manager,
+                                                    item = item,
+                                                    useThreeD = raisedEmojiStyle,
+                                                    editorToken = token
+                                                )
+                                                if (result != SmartEmojiTransport.Result.EDITOR_CHANGED) {
+                                                    managerContext.useEmoji(item.emoji)
+                                                }
+                                            }
+                                            manager.performHapticAndAudioFeedback(
+                                                Constants.CODE_EMOJI, view
+                                            )
+                                        },
+                                        onExit = {
+                                            manager.closeActionWindow()
+                                            manager.performHapticAndAudioFeedback(
+                                                Constants.CODE_SWITCH_ALPHA_SYMBOL, view
+                                            )
+                                        },
+                                        onSpace = {
+                                            manager.sendCodePointEvent(Constants.CODE_SPACE)
+                                            manager.performHapticAndAudioFeedback(Constants.CODE_SPACE, view)
+                                        },
+                                        onBackspace = { isRepeated ->
+                                            manager.backspace(1)
+                                            if (!isRepeated) {
+                                                manager.performHapticAndAudioFeedback(
+                                                    Constants.CODE_DELETE, view
+                                                )
+                                            }
+                                        },
+                                        emojis = emojis,
+                                        keyboardShown = keyboardShown,
+                                        emojiMap = PersistentEmojiState.emojiMap,
+                                        isSearching = searching.value,
+                                        searchFilter = searchText.value
+                                    )
+                                }
+                            }
+                            EmojiMediaPage.GIF -> SharedMediaGallery(
+                                manager = manager, shelf = MediaShelf.GIF,
+                                search = searchText.value,
+                                compact = true,
+                                onCreate = { createMenu.value = true }
+                            )
+                            EmojiMediaPage.STICKERS -> SharedMediaGallery(
+                                manager = manager, shelf = MediaShelf.STICKERS,
+                                search = searchText.value,
+                                compact = true,
+                                onCreate = { createMenu.value = true }
+                            )
+                            EmojiMediaPage.THREE_D -> Fluent3DBrowser(
+                                manager = manager, emojis = emojis,
+                                search = searchText.value, compact = true
+                            )
+                            EmojiMediaPage.FAVORITES -> Column(Modifier.fillMaxSize()) {
+                                FluentFavoritesStrip(
+                                    manager = manager,
+                                    emojis = emojis,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Box(Modifier.weight(1f)) {
+                                    SharedMediaGallery(
+                                        manager = manager, shelf = MediaShelf.FAVORITES,
+                                        search = searchText.value, compact = true
+                                    )
+                                }
+                            }
                         }
-                    }, emojis = emojis, keyboardShown = keyboardShown, emojiMap = PersistentEmojiState.emojiMap,
-                        isSearching = searching.value, searchFilter = searchText.value)
+                    }
                 }
             }
 
@@ -1273,9 +1369,55 @@ val EmojiAction = Action(
                         }
                     }
 
-                    IconButton(onClick = { manager.activateAction(MediaHubAction) }) {
-                        Icon(painterResource(id = R.drawable.smile),
-                            contentDescription = stringResource(R.string.media_hub_title))
+                    Box {
+                        IconButton(onClick = { createMenu.value = true }) {
+                            Text("+", style = MaterialTheme.typography.titleLarge)
+                        }
+                        DropdownMenu(
+                            expanded = createMenu.value,
+                            onDismissRequest = { createMenu.value = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.media_quick_create_sticker)) },
+                                onClick = {
+                                    createMenu.value = false
+                                    manager.getContext().startActivity(
+                                        android.content.Intent(
+                                            manager.getContext(), StickerEditorActivity::class.java
+                                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.media_quick_edit_gif)) },
+                                onClick = {
+                                    createMenu.value = false
+                                    manager.getContext().startActivity(
+                                        android.content.Intent(
+                                            manager.getContext(), GifEditorActivity::class.java
+                                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.media_quick_import)) },
+                                onClick = {
+                                    createMenu.value = false
+                                    manager.getContext().startActivity(
+                                        android.content.Intent(
+                                            manager.getContext(), MediaImportActivity::class.java
+                                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.media_hub_title)) },
+                                onClick = {
+                                    createMenu.value = false
+                                    manager.activateAction(MediaHubAction)
+                                }
+                            )
+                        }
                     }
 
                     IconButton(onClick = {
