@@ -50,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -121,6 +122,7 @@ import org.futo.inputmethod.latin.uix.LocalManager
 import org.futo.inputmethod.latin.uix.PersistentActionState
 import org.futo.inputmethod.latin.uix.SettingsKey
 import org.futo.inputmethod.latin.uix.actions.emoji.EmojiItem
+import org.futo.inputmethod.latin.uix.actions.emoji.EmojiScrollChromeController
 import org.futo.inputmethod.latin.uix.actions.emoji.EmojiView
 import org.futo.inputmethod.latin.uix.actions.emoji.FluentEmoji3DImage
 import org.futo.inputmethod.latin.uix.actions.emoji.SmartEmojiTransport
@@ -395,8 +397,24 @@ fun Emojis(
     modifier: Modifier = Modifier,
     emojiMap: Map<String, EmojiItem>,
     currentCategory: MutableState<CategoryItem>,
-    jumpCategory: MutableState<CategoryItem?>
+    jumpCategory: MutableState<CategoryItem?>,
+    allowChromeCollapse: Boolean = true,
+    onChromeVisibilityChanged: (Boolean) -> Unit = {}
 ) {
+    val density = LocalDensity.current.density
+    val chromeController = remember(density) {
+        EmojiScrollChromeController(
+            collapseAfterPx = (32f * density).roundToInt().coerceAtLeast(1),
+            expandAfterPx = (20f * density).roundToInt().coerceAtLeast(1)
+        )
+    }
+    val visibilityCallback by rememberUpdatedState(onChromeVisibilityChanged)
+    LaunchedEffect(allowChromeCollapse, chromeController) {
+        // Newly mounted grids and search mode always start with their controls visible.
+        if (!allowChromeCollapse) chromeController.expand()
+        visibilityCallback(true)
+    }
+
     val emojiCellDp = useDataStoreValue(EmojiCellSizeSetting).coerceIn(28, 72)
     val raisedEmojiStyle = useDataStoreValue(EmojiReliefSetting)
     val emojiWidth = with(LocalDensity.current) {
@@ -466,6 +484,13 @@ fun Emojis(
                     addOnScrollListener(object : RecyclerView.OnScrollListener() {
                         override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                             super.onScrolled(recyclerView, dx, dy)
+                            if (allowChromeCollapse) {
+                                val userScrolling =
+                                    recyclerView.scrollState != RecyclerView.SCROLL_STATE_IDLE
+                                chromeController.onScrolled(dy, userScrolling)?.let {
+                                    visibilityCallback(it)
+                                }
+                            }
                             val layoutManager = recyclerView.layoutManager as GridLayoutManager
                             val firstVisiblePosition = layoutManager.findFirstVisibleItemPosition()
                             val lastVisiblePosition = layoutManager.findLastCompletelyVisibleItemPosition()
@@ -897,7 +922,8 @@ fun EmojiGrid(
     keyboardShown: Boolean,
     emojiMap: Map<String, EmojiItem>,
     isSearching: Boolean,
-    searchFilter: String
+    searchFilter: String,
+    onChromeVisibilityChanged: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -994,7 +1020,9 @@ fun EmojiGrid(
                     onClick = onClick,
                     emojiMap = emojiMap,
                     currentCategory = currentCategory,
-                    jumpCategory = jumpCategory
+                    jumpCategory = jumpCategory,
+                    allowChromeCollapse = !isSearching,
+                    onChromeVisibilityChanged = onChromeVisibilityChanged
                 )
             }
         } else {
@@ -1009,7 +1037,9 @@ fun EmojiGrid(
                     onClick = onClick,
                     emojiMap = emojiMap,
                     currentCategory = currentCategory,
-                    jumpCategory = jumpCategory
+                    jumpCategory = jumpCategory,
+                    allowChromeCollapse = !isSearching,
+                    onChromeVisibilityChanged = onChromeVisibilityChanged
                 )
                 if (!isSearching) {
                     EmojiNavigation(
@@ -1318,6 +1348,10 @@ val EmojiAction = Action(
         object : ActionWindow() {
             private val searchText = mutableStateOf("")
             private val searching = mutableStateOf(false)
+            private val titleBarCollapsed = mutableStateOf(false)
+
+            override val isTitleBarCollapsed: Boolean
+                get() = titleBarCollapsed.value && !searching.value
 
             @Composable
             override fun windowName(): String {
@@ -1357,7 +1391,10 @@ val EmojiAction = Action(
                             manager.performHapticAndAudioFeedback(Constants.CODE_DELETE, view)
                         }
                     }, emojis = emojis, keyboardShown = keyboardShown, emojiMap = PersistentEmojiState.emojiMap,
-                        isSearching = searching.value, searchFilter = searchText.value)
+                        isSearching = searching.value, searchFilter = searchText.value,
+                        onChromeVisibilityChanged = { expanded ->
+                            titleBarCollapsed.value = !expanded
+                        })
                 }
             }
 
@@ -1379,7 +1416,10 @@ val EmojiAction = Action(
                             .minimumInteractiveComponentSize()
                             .padding(2.dp)
                             .width(128.dp),
-                        onClick = { searching.value = true }
+                        onClick = {
+                            titleBarCollapsed.value = false
+                            searching.value = true
+                        }
                     ) {
                         Box(modifier = Modifier.padding(8.dp), contentAlignment = Alignment.CenterStart) {
                             Row {
