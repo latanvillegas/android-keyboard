@@ -20,11 +20,15 @@ import android.view.inputmethod.InputConnection
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -832,6 +836,15 @@ class UixManager(private val latinIME: LatinIME) {
         }
 
         val showingAboveKeyboard = !mainKeyboardHidden.value
+        val titleBarAvailable = mainKeyboardHidden.value || isInputOverridden.value
+        val collapseTitleBar = titleBarAvailable && windowImpl.isTitleBarCollapsed
+        val titleBarHeight = adjustableActionBarHeight()
+        val reclaimedTitleBarHeight by animateDpAsState(
+            targetValue = if (collapseTitleBar) titleBarHeight else 0.dp,
+            animationSpec = tween(durationMillis = 180),
+            label = "action-title-content-height"
+        )
+
         Column {
             Column(
                 Modifier.background(
@@ -842,13 +855,21 @@ class UixManager(private val latinIME: LatinIME) {
                     }
                 )
             ) {
-                if (mainKeyboardHidden.value || isInputOverridden.value) {
-                    ActionWindowBar(
-                        onBack = { closeActionWindow(true) },
-                        canExpand = currWindowAction.value!!.canShowKeyboard,
-                        onExpand = { toggleExpandAction() },
-                        windowTitleBar = { windowImpl.WindowTitleBar(this) }
-                    )
+                if (titleBarAvailable) {
+                    AnimatedVisibility(
+                        visible = !collapseTitleBar,
+                        enter = expandVertically(animationSpec = tween(180)) +
+                            fadeIn(animationSpec = tween(180)),
+                        exit = shrinkVertically(animationSpec = tween(180)) +
+                            fadeOut(animationSpec = tween(180))
+                    ) {
+                        ActionWindowBar(
+                            onBack = { closeActionWindow(true) },
+                            canExpand = currWindowAction.value!!.canShowKeyboard,
+                            onExpand = { toggleExpandAction() },
+                            windowTitleBar = { windowImpl.WindowTitleBar(this) }
+                        )
+                    }
                 }
 
                 Box(
@@ -859,7 +880,7 @@ class UixManager(private val latinIME: LatinIME) {
                                 .getInputViewHeight()
                                 .toFloat() / heightDiv.toFloat()).toDp() +
                                     if (actionsExpanded) ActionBarHeight else 0.dp)
-                        })
+                        } + reclaimedTitleBarHeight)
                         .safeKeyboardPadding()
                 ) {
                     windowImpl.WindowContents(keyboardShown = !mainKeyboardHidden.value)
