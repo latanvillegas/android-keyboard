@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fluent_pack_title">Optional Fluent 3D collection</string>
+    <string name="fluent_pack_description">Install the verified offline ZIP to enable original Fluent 3D previews. The keyboard works with Unicode without the pack. The collection is not included in the APK.</string>
+    <string name="fluent_pack_import">Import collection ZIP</string>
+    <string name="fluent_pack_remove">Remove installed collection</string>
+    <string name="fluent_pack_remove_confirm">Remove the installed Fluent 3D collection? Text input and Unicode emoji will continue to work.</string>
+    <string name="fluent_pack_importing">Verifying and installing the collection…</string>
+    <string name="fluent_pack_installed">Fluent 3D collection installed</string>
+    <string name="fluent_pack_not_installed">Fluent 3D collection not installed</string>
+    <string name="fluent_pack_import_failed">Could not update the collection: %1$s</string>
+</resources>
