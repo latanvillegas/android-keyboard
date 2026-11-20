@@ -1,0 +1,222 @@
+name: Build Full-Feature Lite 97 Emoji Navigation APK
+
+on:
+  push:
+    branches: [fix/emoji-navigation-on-lite-97]
+    paths:
+      - ".github/workflows/emoji-navigation-lite-apk-ci.yml"
+      - "java/**"
+      - "common/**"
+      - "scripts/**"
+      - "tests/unit/**"
+      - "native/**"
+      - "voiceinput-shared/**"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradle.properties"
+      - ".gitmodules"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: futo-emoji-navigation-lite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stable-release:
+    name: Compile, sign and inspect full-feature Lite navigation APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          lfs: false
+
+      - name: Fetch pinned upstream submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule sync --recursive
+          git -c protocol.version=2 submodule update --init --depth 1 --jobs 4 -- \
+            libs \
+            translations \
+            java/assets/layouts \
+            java/assets/themes \
+            java/res-large \
+            voiceinput-shared/src/main/ml
+
+      - name: Audit Spanish localization and formatting placeholders
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/audit_spanish_resources.py \
+            --root . --out spanish-audit --strict-ui
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK and NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Fluent 3D is an optional runtime import, never a build asset.
+      # Do not fetch, generate, package or publish a multimedia collection.
+      - name: Exclude optional external Fluent assets from APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf java/assets/emoji3d java/assets/emoji3d-share java/assets/emoji3d-motion
+          for folder in emoji3d emoji3d-share emoji3d-motion; do
+            test ! -e "java/assets/$folder"
+          done
+
+      - name: Configure production signing if secrets exist
+        id: signing
+        shell: bash
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$RELEASE_KEYSTORE_BASE64" ]]; then
+            if [[ -z "$RELEASE_KEY_ALIAS" || -z "$RELEASE_KEY_PASSWORD" || -z "$RELEASE_STORE_PASSWORD" ]]; then
+              echo "::error::All four release signing secrets must be configured."
+              exit 1
+            fi
+            printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release-signing.jks"
+            chmod 600 "$RUNNER_TEMP/release-signing.jks"
+            python3 - <<'PY'
+          import os
+          from pathlib import Path
+          def escape_prop(v):
+              result = v.replace(chr(92), chr(92) + chr(92))
+              result = result.replace(chr(10), chr(92) + 'n')
+              result = result.replace(chr(13), chr(92) + 'r')
+              result = result.replace('=', chr(92) + '=')
+              result = result.replace(':', chr(92) + ':')
+              result = result.replace(' ', chr(92) + ' ')
+              return result
+          values = {
+              'storeFile': str(Path(os.environ['RUNNER_TEMP']) / 'release-signing.jks'),
+              'storePassword': os.environ['RELEASE_STORE_PASSWORD'],
+              'keyPassword': os.environ['RELEASE_KEY_PASSWORD'],
+              'keyAlias': os.environ['RELEASE_KEY_ALIAS'],
+          }
+          Path('keystore.properties').write_text(
+              ''.join(k + '=' + escape_prop(v) + chr(10) for k, v in values.items()),
+              encoding='utf-8'
+          )
+          PY
+            echo "kind=production-signed" >> "$GITHUB_OUTPUT"
+            echo "SIGNING_KIND=production-signed" >> "$GITHUB_ENV"
+          else
+            if [[ -n "$RELEASE_KEY_ALIAS" || -n "$RELEASE_KEY_PASSWORD" || -n "$RELEASE_STORE_PASSWORD" ]]; then
+              echo "::error::Signing secrets are incomplete."
+              exit 1
+            fi
+            test -f java/shared.keystore
+            echo "::warning::Stable Release uses DEVELOPMENT signing; do not publish as a production update."
+            echo "kind=test-signed" >> "$GITHUB_OUTPUT"
+            echo "SIGNING_KIND=test-signed" >> "$GITHUB_ENV"
+          fi
+
+      - name: Assemble optimized Stable Release APK
+        shell: bash
+        env:
+          VERSION_NAME: fork-nav-preview-98
+          VERSION_CODE: "98"
+          BRANCH_NAME: master
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          # JVM regression tests compile no Debug APK or instrumentation package.
+          ./gradlew --no-daemon --stacktrace --build-cache --warning-mode summary \
+            testStableReleaseUnitTest assembleStableRelease
+
+      - name: Verify APK signature and ensure it contains no Fluent assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="$(find build/outputs/apk/stable/release -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          if [[ -z "$apk" || ! -s "$apk" ]]; then
+            echo "::error::No Stable Release APK was produced."
+            exit 1
+          fi
+
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" >/dev/null
+          unzip -t "$apk" >/dev/null
+
+          # Verify that the build retains the feature-complete #97 codebase.
+          for source in \
+            java/src/org/futo/inputmethod/latin/uix/actions/media/OfflineAiAction.kt \
+            java/src/org/futo/inputmethod/latin/uix/actions/media/MediaHubAction.kt \
+            java/src/org/futo/inputmethod/latin/uix/actions/media/FluentHqPackStore.kt \
+            java/src/org/futo/inputmethod/latin/uix/actions/media/AnimatedGifEditor.kt; do
+            test -s "$source"
+          done
+          python3 - "$apk" <<'PY'
+          from pathlib import Path
+          from sys import argv
+          from zipfile import ZipFile
+
+          apk = Path(argv[1])
+          forbidden = (
+              "assets/emoji3d/",
+              "assets/emoji3d-share/",
+              "assets/emoji3d-motion/",
+          )
+          with ZipFile(apk) as archive:
+              bundled_media = [
+                  name for name in archive.namelist()
+                  if name.startswith(forbidden)
+              ]
+          if bundled_media:
+              raise SystemExit(
+                  "Bundled Fluent assets are forbidden: "
+                  + ", ".join(bundled_media[:5])
+              )
+          print("APK verified: no bundled Fluent 3D or GIF collections.")
+          PY
+
+          # Only the APK may be present in this artifact directory.
+          rm -rf release-dist
+          mkdir -p release-dist
+          cp "$apk" release-dist/futo-keyboard-emoji-navigation-lite.apk
+          test "$(find release-dist -maxdepth 1 -type f | wc -l)" -eq 1
+
+      - name: Publish APK-only compressed ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: futo-keyboard-emoji-navigation-lite-${{ steps.signing.outputs.kind }}
+          path: release-dist/futo-keyboard-emoji-navigation-lite.apk
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+      - name: Remove signing materials
+        if: always()
+        shell: bash
+        run: |
+          rm -f keystore.properties "$RUNNER_TEMP/release-signing.jks"
