@@ -17,9 +17,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +29,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -71,10 +74,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -749,6 +754,93 @@ private fun EmojiCategoriesContainer(
     }
 }
 
+
+/**
+ * Wide-layout navigation rail: the emoji list stays independently scrollable,
+ * while categories, keyboard return and backspace remain accessible.
+ */
+@Composable
+private fun EmojiCategoryRail(
+    showKeys: Boolean,
+    onExit: () -> Unit,
+    onBackspace: (Boolean) -> Unit,
+    categories: List<CategoryItem>,
+    activeCategoryItem: CategoryItem,
+    goToCategory: (CategoryItem) -> Unit
+) {
+    val resources = LocalResources.current
+    val scheme = LocalKeyboardScheme.current
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(activeCategoryItem) {
+        val index = categories.indexOf(activeCategoryItem)
+        if (index >= 0) listState.animateScrollToItem(index)
+    }
+
+    Column(
+        modifier = Modifier
+            .width(196.dp)
+            .fillMaxHeight()
+            .padding(end = 6.dp)
+    ) {
+        if (showKeys) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                LettersKey(onExit)
+                BackspaceKey(onBackspace)
+            }
+        }
+
+        LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
+            items(categories, key = { it.title }) { category ->
+                val localizedTitle = localizedCategoryNameMap[category.title]
+                    ?.let { resources.getString(it) } ?: category.title
+                val isActive = category == activeCategoryItem
+                val icon = iconMap[category.title]
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp)
+                        .background(
+                            if (isActive) scheme.keyboardContainerPressed else Color.Transparent,
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable(role = Role.Button) { goToCategory(category) }
+                        .semantics {
+                            contentDescription = resources.getString(
+                                R.string.action_emoji_jump_to_category,
+                                localizedTitle
+                            )
+                            toggleableState = ToggleableState(isActive)
+                        }
+                        .height(40.dp)
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (icon != null) {
+                        Icon(
+                            painter = painterResource(id = icon),
+                            contentDescription = null,
+                            tint = scheme.onKeyboardContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Text(
+                        localizedTitle,
+                        style = Typography.SmallMl.copy(color = scheme.onKeyboardContainer),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun BackspaceKey(onBackspace: (Boolean) -> Unit) {
     val resources = LocalResources.current
@@ -873,36 +965,63 @@ fun EmojiGrid(
         }
     }
 
-    Column {
-        Emojis(
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .fillMaxWidth()
-                .weight(1.0f)
-                .background(
-                    LocalKeyboardScheme.current.keyboardContainer,
-                    RoundedCornerShape(9.dp)
-                ),
-            emojis = emojiList,
-            onClick = onClick,
-            emojiMap = emojiMap,
-            currentCategory = currentCategory,
-            jumpCategory = jumpCategory
-        )
+    // Use the keyboard's actual available width, not the physical device class.
+    // Search results intentionally occupy the full width without category chrome.
+    val categories = remember(categorizedEmojis) {
+        listOf(CategoryItem("Recent")) + categorizedEmojis.filterIsInstance<CategoryItem>()
+    }
+    val keyboardSurface = LocalKeyboardScheme.current.keyboardContainer
 
-        if(!isSearching) {
-            EmojiNavigation(
-                showKeys = !keyboardShown,
-                onExit = onExit,
-                onBackspace = onBackspace,
-                categories = listOf(
-                    CategoryItem("Recent")
-                ) + categorizedEmojis.filterIsInstance<CategoryItem>(),
-                activeCategoryItem = currentCategory.value,
-                goToCategory = {
-                    jumpCategory.value = it
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val useRail = maxWidth >= 600.dp && !isSearching
+
+        if (useRail) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                EmojiCategoryRail(
+                    showKeys = !keyboardShown,
+                    onExit = onExit,
+                    onBackspace = onBackspace,
+                    categories = categories,
+                    activeCategoryItem = currentCategory.value,
+                    goToCategory = { jumpCategory.value = it }
+                )
+                Emojis(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(keyboardSurface, RoundedCornerShape(9.dp)),
+                    emojis = emojiList,
+                    onClick = onClick,
+                    emojiMap = emojiMap,
+                    currentCategory = currentCategory,
+                    jumpCategory = jumpCategory
+                )
+            }
+        } else {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Emojis(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .background(keyboardSurface, RoundedCornerShape(9.dp)),
+                    emojis = emojiList,
+                    onClick = onClick,
+                    emojiMap = emojiMap,
+                    currentCategory = currentCategory,
+                    jumpCategory = jumpCategory
+                )
+                if (!isSearching) {
+                    EmojiNavigation(
+                        showKeys = !keyboardShown,
+                        onExit = onExit,
+                        onBackspace = onBackspace,
+                        categories = categories,
+                        activeCategoryItem = currentCategory.value,
+                        goToCategory = { jumpCategory.value = it }
+                    )
                 }
-            )
+            }
         }
     }
 }
