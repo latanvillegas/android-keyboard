@@ -146,6 +146,10 @@ abstract class ActionWindow {
     open val fixedWindowHeight: Dp?
         get() = null
 
+    /** Opt-in title bar collapse. Other action windows remain unaffected. */
+    open val isTitleBarCollapsed: Boolean
+        get() = false
+
     @Composable
     abstract fun windowName(): String
 

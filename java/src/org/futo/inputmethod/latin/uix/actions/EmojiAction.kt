@@ -19,9 +19,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +32,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,6 +55,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -76,10 +80,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -121,6 +127,7 @@ import org.futo.inputmethod.latin.uix.LocalManager
 import org.futo.inputmethod.latin.uix.PersistentActionState
 import org.futo.inputmethod.latin.uix.SettingsKey
 import org.futo.inputmethod.latin.uix.actions.emoji.EmojiItem
+import org.futo.inputmethod.latin.uix.actions.emoji.EmojiScrollChromeController
 import org.futo.inputmethod.latin.uix.actions.emoji.EmojiView
 import org.futo.inputmethod.latin.uix.actions.emoji.FluentEmoji3DImage
 import org.futo.inputmethod.latin.uix.actions.emoji.SmartEmojiTransport
@@ -405,8 +412,25 @@ fun Emojis(
     modifier: Modifier = Modifier,
     emojiMap: Map<String, EmojiItem>,
     currentCategory: MutableState<CategoryItem>,
-    jumpCategory: MutableState<CategoryItem?>
+    jumpCategory: MutableState<CategoryItem?>,
+    allowChromeCollapse: Boolean = true,
+    onChromeVisibilityChanged: (Boolean) -> Unit = {}
 ) {
+    val density = LocalDensity.current.density
+    val chromeController = remember(density) {
+        EmojiScrollChromeController(
+            collapseAfterPx = (32f * density).roundToInt().coerceAtLeast(1),
+            expandAfterPx = (20f * density).roundToInt().coerceAtLeast(1)
+        )
+    }
+    val visibilityCallback by rememberUpdatedState(onChromeVisibilityChanged)
+    val chromeCollapseAllowed by rememberUpdatedState(allowChromeCollapse)
+    LaunchedEffect(allowChromeCollapse, chromeController) {
+        // Newly mounted grids and search mode always start with their controls visible.
+        if (!allowChromeCollapse) chromeController.expand()
+        visibilityCallback(true)
+    }
+
     val emojiCellDp = useDataStoreValue(EmojiCellSizeSetting).coerceIn(28, 72)
     val raisedEmojiStyle = useDataStoreValue(EmojiReliefSetting)
     val emojiWidth = with(LocalDensity.current) {
@@ -476,17 +500,27 @@ fun Emojis(
                     addOnScrollListener(object : RecyclerView.OnScrollListener() {
                         override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                             super.onScrolled(recyclerView, dx, dy)
+                            if (chromeCollapseAllowed) {
+                                val userScrolling =
+                                    recyclerView.scrollState != RecyclerView.SCROLL_STATE_IDLE
+                                chromeController.onScrolled(dy, userScrolling)?.let {
+                                    visibilityCallback(it)
+                                }
+                            }
                             val layoutManager = recyclerView.layoutManager as GridLayoutManager
                             val firstVisiblePosition = layoutManager.findFirstVisibleItemPosition()
+                            if (firstVisiblePosition < 0) return
                             val lastVisiblePosition = layoutManager.findLastCompletelyVisibleItemPosition()
+                            val displayedItems = emojiAdapter.currentList
 
-                            val finalCategoryIndex = emojis.indexOfLast { it is CategoryItem }
-                            if(finalCategoryIndex == -1) return
+                            val finalCategoryIndex = displayedItems.indexOfLast { it is CategoryItem }
+                            if (finalCategoryIndex == -1) return
 
-                            if(finalCategoryIndex < lastVisiblePosition) {
-                                currentCategory.value = emojis[finalCategoryIndex] as CategoryItem
+                            if (finalCategoryIndex < lastVisiblePosition) {
+                                currentCategory.value = displayedItems[finalCategoryIndex] as CategoryItem
                             } else {
-                                val itm = emojis.subList(0, firstVisiblePosition + 1)
+                                val lastIndex = (firstVisiblePosition + 1).coerceAtMost(displayedItems.size)
+                                val itm = displayedItems.subList(0, lastIndex)
                                     .lastOrNull { it is CategoryItem }
 
                                 if (itm != null) {
@@ -764,6 +798,92 @@ private fun EmojiCategoriesContainer(
     }
 }
 
+/**
+ * Wide-layout navigation rail: the emoji list stays independently scrollable,
+ * while categories, keyboard return and backspace remain accessible.
+ */
+@Composable
+private fun EmojiCategoryRail(
+    showKeys: Boolean,
+    onExit: () -> Unit,
+    onBackspace: (Boolean) -> Unit,
+    categories: List<CategoryItem>,
+    activeCategoryItem: CategoryItem,
+    goToCategory: (CategoryItem) -> Unit
+) {
+    val resources = LocalResources.current
+    val scheme = LocalKeyboardScheme.current
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(activeCategoryItem) {
+        val index = categories.indexOf(activeCategoryItem)
+        if (index >= 0) listState.animateScrollToItem(index)
+    }
+
+    Column(
+        modifier = Modifier
+            .width(196.dp)
+            .fillMaxHeight()
+            .padding(end = 6.dp)
+    ) {
+        if (showKeys) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                LettersKey(onExit)
+                BackspaceKey(onBackspace)
+            }
+        }
+
+        LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
+            items(categories, key = { it.title }) { category ->
+                val localizedTitle = localizedCategoryNameMap[category.title]
+                    ?.let { resources.getString(it) } ?: category.title
+                val isActive = category == activeCategoryItem
+                val icon = iconMap[category.title]
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp)
+                        .background(
+                            if (isActive) scheme.keyboardContainerPressed else Color.Transparent,
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable(role = Role.Button) { goToCategory(category) }
+                        .semantics {
+                            contentDescription = resources.getString(
+                                R.string.action_emoji_jump_to_category,
+                                localizedTitle
+                            )
+                            toggleableState = ToggleableState(isActive)
+                        }
+                        .height(40.dp)
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (icon != null) {
+                        Icon(
+                            painter = painterResource(id = icon),
+                            contentDescription = null,
+                            tint = scheme.onKeyboardContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Text(
+                        localizedTitle,
+                        style = Typography.SmallMl.copy(color = scheme.onKeyboardContainer),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun BackspaceKey(onBackspace: (Boolean) -> Unit) {
     val resources = LocalResources.current
@@ -820,7 +940,8 @@ fun EmojiGrid(
     keyboardShown: Boolean,
     emojiMap: Map<String, EmojiItem>,
     isSearching: Boolean,
-    searchFilter: String
+    searchFilter: String,
+    onChromeVisibilityChanged: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -888,36 +1009,68 @@ fun EmojiGrid(
         }
     }
 
-    Column {
-        Emojis(
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .fillMaxWidth()
-                .weight(1.0f)
-                .background(
-                    LocalKeyboardScheme.current.keyboardContainer,
-                    RoundedCornerShape(9.dp)
-                ),
-            emojis = emojiList,
-            onClick = onClick,
-            emojiMap = emojiMap,
-            currentCategory = currentCategory,
-            jumpCategory = jumpCategory
-        )
+    // Use the keyboard's actual available width, not the physical device class.
+    // Search results intentionally occupy the full width without category chrome.
+    val categories = remember(categorizedEmojis, recentEmojis) {
+        (if (recentEmojis.isNotEmpty()) listOf(CategoryItem("Recent")) else emptyList()) +
+            categorizedEmojis.filterIsInstance<CategoryItem>()
+    }
+    val keyboardSurface = LocalKeyboardScheme.current.keyboardContainer
 
-        if(!isSearching) {
-            EmojiNavigation(
-                showKeys = !keyboardShown,
-                onExit = onExit,
-                onBackspace = onBackspace,
-                categories = listOf(
-                    CategoryItem("Recent")
-                ) + categorizedEmojis.filterIsInstance<CategoryItem>(),
-                activeCategoryItem = currentCategory.value,
-                goToCategory = {
-                    jumpCategory.value = it
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val useRail = maxWidth >= 600.dp && !isSearching
+
+        if (useRail) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                EmojiCategoryRail(
+                    showKeys = !keyboardShown,
+                    onExit = onExit,
+                    onBackspace = onBackspace,
+                    categories = categories,
+                    activeCategoryItem = currentCategory.value,
+                    goToCategory = { jumpCategory.value = it }
+                )
+                Emojis(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(keyboardSurface, RoundedCornerShape(9.dp)),
+                    emojis = emojiList,
+                    onClick = onClick,
+                    emojiMap = emojiMap,
+                    currentCategory = currentCategory,
+                    jumpCategory = jumpCategory,
+                    allowChromeCollapse = !isSearching,
+                    onChromeVisibilityChanged = onChromeVisibilityChanged
+                )
+            }
+        } else {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Emojis(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .background(keyboardSurface, RoundedCornerShape(9.dp)),
+                    emojis = emojiList,
+                    onClick = onClick,
+                    emojiMap = emojiMap,
+                    currentCategory = currentCategory,
+                    jumpCategory = jumpCategory,
+                    allowChromeCollapse = !isSearching,
+                    onChromeVisibilityChanged = onChromeVisibilityChanged
+                )
+                if (!isSearching) {
+                    EmojiNavigation(
+                        showKeys = !keyboardShown,
+                        onExit = onExit,
+                        onBackspace = onBackspace,
+                        categories = categories,
+                        activeCategoryItem = currentCategory.value,
+                        goToCategory = { jumpCategory.value = it }
+                    )
                 }
-            )
+            }
         }
     }
 }
@@ -1216,6 +1369,11 @@ val EmojiAction = Action(
             private val searching = mutableStateOf(false)
             private val activeMediaPage = mutableStateOf(EmojiMediaNavigation.take())
             private val createMenu = mutableStateOf(false)
+            private val titleBarCollapsed = mutableStateOf(false)
+
+            override val isTitleBarCollapsed: Boolean
+                get() = titleBarCollapsed.value &&
+                    !searching.value && activeMediaPage.value == EmojiMediaPage.EMOJIS
 
             @Composable
             override fun windowName(): String {
@@ -1228,6 +1386,11 @@ val EmojiAction = Action(
                 val managerContext = manager.getContext()
                 val raisedEmojiStyle = useDataStoreValue(EmojiReliefSetting)
                 val emojis = PersistentEmojiState.emojis.value.orEmpty()
+                LaunchedEffect(activeMediaPage.value) {
+                    if (activeMediaPage.value != EmojiMediaPage.EMOJIS) {
+                        titleBarCollapsed.value = false
+                    }
+                }
 
                 Column(modifier = Modifier.fillMaxSize()) {
                     // One horizontal media mode strip; original Emoji categories
@@ -1301,7 +1464,10 @@ val EmojiAction = Action(
                                         keyboardShown = keyboardShown,
                                         emojiMap = PersistentEmojiState.emojiMap,
                                         isSearching = searching.value,
-                                        searchFilter = searchText.value
+                                        searchFilter = searchText.value,
+                                        onChromeVisibilityChanged = { expanded ->
+                                            titleBarCollapsed.value = !expanded
+                                        }
                                     )
                                 }
                             }
@@ -1357,7 +1523,10 @@ val EmojiAction = Action(
                             .minimumInteractiveComponentSize()
                             .padding(2.dp)
                             .width(128.dp),
-                        onClick = { searching.value = true }
+                        onClick = {
+                            titleBarCollapsed.value = false
+                            searching.value = true
+                        }
                     ) {
                         Box(modifier = Modifier.padding(8.dp), contentAlignment = Alignment.CenterStart) {
                             Row {
