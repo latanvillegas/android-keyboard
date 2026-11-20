@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fluent_pack_title">Colección Fluent 3D opcional</string>
+    <string name="fluent_pack_description">Importa el ZIP sin conexión para habilitar los emojis Fluent 3D originales. El teclado funciona con Unicode sin el paquete. La colección no se incluye en la APK.</string>
+    <string name="fluent_pack_import">Importar ZIP de la colección</string>
+    <string name="fluent_pack_remove">Quitar colección instalada</string>
+    <string name="fluent_pack_remove_confirm">¿Quitar la colección Fluent 3D? La escritura y los emojis Unicode seguirán funcionando.</string>
+    <string name="fluent_pack_importing">Verificando e instalando la colección…</string>
+    <string name="fluent_pack_installed">Colección Fluent 3D instalada</string>
+    <string name="fluent_pack_not_installed">Colección Fluent 3D no instalada</string>
+    <string name="fluent_pack_import_failed">No se pudo actualizar la colección: %1$s</string>
+</resources>
