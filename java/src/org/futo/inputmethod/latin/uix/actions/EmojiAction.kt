@@ -409,6 +409,7 @@ fun Emojis(
         )
     }
     val visibilityCallback by rememberUpdatedState(onChromeVisibilityChanged)
+    val chromeCollapseAllowed by rememberUpdatedState(allowChromeCollapse)
     LaunchedEffect(allowChromeCollapse, chromeController) {
         // Newly mounted grids and search mode always start with their controls visible.
         if (!allowChromeCollapse) chromeController.expand()
@@ -484,7 +485,7 @@ fun Emojis(
                     addOnScrollListener(object : RecyclerView.OnScrollListener() {
                         override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                             super.onScrolled(recyclerView, dx, dy)
-                            if (allowChromeCollapse) {
+                            if (chromeCollapseAllowed) {
                                 val userScrolling =
                                     recyclerView.scrollState != RecyclerView.SCROLL_STATE_IDLE
                                 chromeController.onScrolled(dy, userScrolling)?.let {
@@ -493,15 +494,18 @@ fun Emojis(
                             }
                             val layoutManager = recyclerView.layoutManager as GridLayoutManager
                             val firstVisiblePosition = layoutManager.findFirstVisibleItemPosition()
+                            if (firstVisiblePosition < 0) return
                             val lastVisiblePosition = layoutManager.findLastCompletelyVisibleItemPosition()
+                            val displayedItems = emojiAdapter.currentList
 
-                            val finalCategoryIndex = emojis.indexOfLast { it is CategoryItem }
-                            if(finalCategoryIndex == -1) return
+                            val finalCategoryIndex = displayedItems.indexOfLast { it is CategoryItem }
+                            if (finalCategoryIndex == -1) return
 
-                            if(finalCategoryIndex < lastVisiblePosition) {
-                                currentCategory.value = emojis[finalCategoryIndex] as CategoryItem
+                            if (finalCategoryIndex < lastVisiblePosition) {
+                                currentCategory.value = displayedItems[finalCategoryIndex] as CategoryItem
                             } else {
-                                val itm = emojis.subList(0, firstVisiblePosition + 1)
+                                val lastIndex = (firstVisiblePosition + 1).coerceAtMost(displayedItems.size)
+                                val itm = displayedItems.subList(0, lastIndex)
                                     .lastOrNull { it is CategoryItem }
 
                                 if (itm != null) {
@@ -993,8 +997,9 @@ fun EmojiGrid(
 
     // Use the keyboard's actual available width, not the physical device class.
     // Search results intentionally occupy the full width without category chrome.
-    val categories = remember(categorizedEmojis) {
-        listOf(CategoryItem("Recent")) + categorizedEmojis.filterIsInstance<CategoryItem>()
+    val categories = remember(categorizedEmojis, recentEmojis) {
+        (if (recentEmojis.isNotEmpty()) listOf(CategoryItem("Recent")) else emptyList()) +
+            categorizedEmojis.filterIsInstance<CategoryItem>()
     }
     val keyboardSurface = LocalKeyboardScheme.current.keyboardContainer
 
