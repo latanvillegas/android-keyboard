@@ -72,6 +72,11 @@
         -->
 
         <!-- Activities -->
+        <activity
+            android:name=".uix.actions.emoji.FluentHqPackActivity"
+            android:label="@string/fluent_pack_title"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
+            android:exported="false" />
         <activity android:name=".uix.settings.SettingsActivity"
              android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
              android:icon="@mipmap/ic_launcher"
