@@ -180,7 +180,7 @@ import kotlin.math.roundToInt
 val ActionBarHeight = 40.dp
 
 @Composable
-private fun adjustableActionBarHeight(): Dp =
+internal fun adjustableActionBarHeight(): Dp =
     useDataStoreValue(SuggestionBarHeightSetting).coerceIn(24, 200).dp
 
 @Composable
